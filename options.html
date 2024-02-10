@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Best before options</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h2>&#128221; Options</h2>
+    <form>
+      <label for="default-hours">Default expiry in hours:</label>
+      <input
+        type="number"
+        id="default-hours"
+        name="default-hours"
+        value="12"
+        min="0"
+      />
+    </form>
+    <hr />
+    <h2>&#129300; What is this?</h2>
+    <p>
+        This extension adds an expiry date to tabs: when they expire they are
+        automatically thrown away.
+      </p>
+      <p>
+        Above you can set the default tab duration. By activating the extension
+        you can customise the expiry of a particular tab, or set a tab as not
+        expiring, particularly useful for pinned tabs.
+    </p>
+    <hr />
+
+    <h2>&#8505; Attribution</h2>
+    <span style="font-size: 80%">
+      <ul>
+        <li><a href="https://www.mostlymaths.net">Ruben Berenguel, 2024</a></li>
+        <li>
+          The icon is an image
+          <a
+            href="https://www.freepik.com/free-vector/bar-qr-codes-white-stickers-set-label-information-data-identification-strip_10602030.htm#query=barcode&position=0&from_view=keyword&track=sph&uuid=d878575d-8b03-4d9c-bc19-52617e9d7f4b"
+          >
+            by macrovector</a
+          >
+          on Freepik
+        </li>
+        <li>
+          Uses the
+          <a href="https://moment.github.io/luxon/#/">luxon.js</a> datetime
+          library
+        </li>
+        <li>
+          Many thanks to
+          <a href="http://gemini.google.com">Google Gemini</a> for the help
+        </li>
+      </ul>
+    </span>
+    <br/>
+    <script src="options.js"></script>
+  </body>
+</html>
