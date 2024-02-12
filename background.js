@@ -11,9 +11,10 @@ chrome.storage.local.get(
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === "updateBadge") {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          console.log(`Updating badge of ${tabs}`)
-          setBadgeAndTitle(tabs[0].id)})
-      }});
+          if(tabs && tabs[0] && tabs[0].id){
+            setBadgeAndTitle(tabs[0].id);
+          }
+      })}});
 
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === "checkExpiration") {
@@ -70,16 +71,16 @@ chrome.storage.local.get(
 
     chrome.tabs.onCreated.addListener((tab) => {
       chrome.storage.sync.get(["best-before-default-hours"], (data) => {
-        console.log(data);
         const expirationDateTime = DateTime.now();
         const formatted = expirationDateTime.plus({hours: data['best-before-default-hours']}).toString();
         setExpirationDateTime(tab.id, formatted);
+        setBadgeAndTitle(tab.id);
       });
       
     });
 
     const setBadgeAndTitle = (tabId) => {
-      let setBadge = false;
+      let setBadge = true;
       let color = [0, 0, 0, 0];
       const currentTime = DateTime.now();
       const expirationDate = expirationDates[tabId];
@@ -90,24 +91,17 @@ chrome.storage.local.get(
         return;
       }
       if(expirationDate){
-        console.log(expirationDate)
         const expirationDateTime = DateTime.fromISO(expirationDate);
-        console.log(currentTime);
-        console.log(expirationDateTime)
         const diffMonths = expirationDateTime.diff(currentTime, 'months').toObject().months;
         const diffDays = expirationDateTime.diff(currentTime, 'days').toObject().days;
         const diffHours = expirationDateTime.diff(currentTime, 'hours').toObject().hours;
         const diffMinutes = expirationDateTime.diff(currentTime, 'minutes').toObject().minutes;
         const diff = expirationDateTime.diff(currentTime, ['months', 'days', 'hours', 'minutes']).toObject()
-        console.log(diffMonths)
-        console.log(diffDays)
-        console.log(diffHours)
-        console.log(diffMinutes)
         let count = Math.ceil(diffMonths);
         let abbr = 'M';
         if(diffDays < 31){
           count = Math.ceil(diffDays);
-          abbr = 'D';
+          abbr = 'd';
           if(diffHours < 24){
             count = Math.ceil(diffHours);
             abbr = 'h';
@@ -127,24 +121,31 @@ chrome.storage.local.get(
           }
         }
         if(setBadge){
+          console.log(`Setting badge for ${tabId} with ${count}${abbr}`);
           chrome.action.setBadgeText({tabId: tabId,  text: `${count}${abbr}`});
           chrome.action.setBadgeBackgroundColor({tabId: tabId, color: color});
         } else {
+          console.log(`Setting badge for ${tabId} with empty`);
           chrome.action.setBadgeText({tabId: tabId,  text: ""});
         }
         chrome.action.setTitle({tabId: tabId, title: `Best before: ${diff.months} months, ${diff.days} days, ${diff.hours} hours, ${Math.floor(diff.minutes)} minutes`});
       }
     }
 
+    chrome.tabs.onUpdated.addListener(
+      (tab) => {
+        // Seriously one API has an integer and the other an object? Seriously?
+        setBadgeAndTitle(tab);
+      }
+    );
+
     chrome.tabs.onActivated.addListener((tab) => {
       setBadgeAndTitle(tab.tabId);
-    })
+    });
 
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      console.log(request);
       if (request.setExpiration) {
         const { tabId, chosenDateTime } = request.setExpiration;
-        console.log(request.setExpiration.chosenDateTime);
         setExpirationDateTime(
           request.setExpiration.tabId,
           request.setExpiration.chosenDateTime
