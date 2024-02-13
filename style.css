@@ -1,4 +1,46 @@
+@font-face {
+  font-family: monoid;
+  src: url(./monoid-regular-webfont.woff);
+}
+
 body {
-  font-family: monospace;
-  font-size: 110%;
+  font-family: monoid, monospace;
+  font-size: 100%;
+}
+
+#tab-info {
+  background: none;
+  color: inherit;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  outline: inherit;
+  font-weight: bold;
+  font-size: 115%;
+  color: blue;
+}
+
+button.specific {
+  font-size: 75%;
+  width: 100%;
+}
+
+button.delete {
+  margin-left: 2em;
+}
+
+td.link {
+  padding-left: 2em;
+  padding-right: 2em;
+  min-width: 15%;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+tr {
+  border-bottom: 1px solid #c0c0c0;
 }

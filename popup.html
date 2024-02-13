@@ -6,10 +6,26 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <h2>Best before…</h2>
+    <h4>Best before… <button id="tab-info">&#8505;</button></h4>
     <input type="datetime-local" id="expiration-picker" />
     <hr />
-    <button id="no-expiry">No expiry</button>
+
+    <hr />
+    <table>
+      <tr>
+        <td><button class="specific" id="no-expiry">Forever</button></td>
+        <td><button class="specific" id="one-hour">1 hour</button></td>
+        <td><button class="specific" id="three-hours">3 hours</button></td>
+      </tr>
+      <tr>
+        <td><button class="specific" id="one-day">1 day</button></td>
+        <td><button class="specific" id="three-days">3 days</button></td>
+        <td><button class="specific" id="seven-days">7 days</button></td>
+      </tr>
+      <tr>
+        <td><button class="specific" id="one-month">1 month</button></td>
+      </tr>
+    </table>
     <script src="popup.js" type="module"></script>
   </body>
 </html>

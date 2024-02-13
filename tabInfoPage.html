@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Best before options</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <div style="width: 50%; margin-bottom: 2em">
+    Here you can see the expiries of all tabs currently stored, as well as
+    delete any that may look weird for any reason. Soon, there will be also a
+    list of recently (last day) closed tabs.
+  </div>
+  <body>
+    <table border="0">
+      <thead>
+        <tr>
+          <th>Tab ID</th>
+          <th>Page</th>
+          <th>Expiry</th>
+        </tr>
+      </thead>
+      <tbody id="tabInfoTable"></tbody>
+    </table>
+    <script src="tabInfo.js" type="module"></script>
+  </body>
+</html>
