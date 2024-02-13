@@ -9,9 +9,10 @@ By activating the extension you can customise the expiry of a particular
 tab, or set a tab as not expiring, particularly useful for pinned tabs.
 By default, any new tab should get 12 hours, this default can be customised.
 
-Hover over the extension to see what time is left in the current tab. When
-there are less than 2 hours the remaining amount of minutes will be shown
-in the extension badge.
+Hover over the extension to see exactly how much time a tab has left. The
+extension badge shows the "topline time left", rounding up. So, it will say
+"12 hours" when it's 11 hours 50 minutes. As soon as it goes below 60 minutes
+it will stop rounding up and show in red, in case you need to extend it.
 
 I take no responsibility on any data you might lose by using this extension!
 
