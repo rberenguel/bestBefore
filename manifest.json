@@ -5,18 +5,18 @@
   "description": "Automatically closes tabs on their expiration date",
   "permissions": ["activeTab", "storage", "alarms", "tabs"],
   "options_ui": {
-    "page": "options.html",
+    "page": "src/options.html",
     "open_in_tab": false
   },
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "src/background.js",
     "type": "module"
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "src/popup.html"
   },
   "icons": {
-    "128": "icon128.png",
-    "48": "icon48.png"
+    "128": "media/icon128.png",
+    "48": "media/icon48.png"
   }
 }

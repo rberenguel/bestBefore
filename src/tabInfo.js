@@ -1,6 +1,12 @@
-import { DateTime } from "./lib/luxon.js";
+import { DateTime } from "../lib/luxon.js";
 
-import { kExpirationKey, kURLKey, kTitleKey, kStorageKey } from "./common.js";
+import {
+  kExpirationKey,
+  kURLKey,
+  kTitleKey,
+  kStorageKey,
+  kForeverTab,
+} from "./common.js";
 
 chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   const expiringTabInformation = storedData[kStorageKey];
@@ -20,9 +26,12 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       document.getElementById(rowFor(tabId)).remove();
     }
     const buttonId = `delete-${tabId}`;
-    const formatted = DateTime.fromISO(
-      tabInformation[kExpirationKey]
-    ).toLocaleString(DateTime.DATETIME_MED);
+    let formatted = "Does not expire";
+    if (tabInformation[kExpirationKey] !== kForeverTab) {
+      formatted = DateTime.fromISO(
+        tabInformation[kExpirationKey]
+      ).toLocaleString(DateTime.DATETIME_MED);
+    }
     row.innerHTML = `
       <td>${tabId}</td>
       <td class='link'>${link}</a></td>

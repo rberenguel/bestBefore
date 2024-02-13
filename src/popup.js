@@ -1,4 +1,4 @@
-import { DateTime } from "./lib/luxon.js";
+import { DateTime } from "../lib/luxon.js";
 
 import { kExpirationKey, kForeverTab, kStorageKey } from "./common.js";
 
@@ -51,7 +51,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   });
 
   seeTabInfoButton.addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("tabInfoPage.html") });
+    chrome.tabs.create({ url: chrome.runtime.getURL("src/tabInfoPage.html") });
   });
 
   oneHourButton.addEventListener("click", () => {
