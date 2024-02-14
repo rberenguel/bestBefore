@@ -93,13 +93,19 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   chrome.tabs.onCreated.addListener((tab) => {
     chrome.storage.sync.get([kStorageDefaultHours], (data) => {
       const expirationDateTime = DateTime.now();
+      const defaultExpiry =
+        data[kStorageDefaultHours] && data[kStorageDefaultHours] !== ""
+          ? data[kStorageDefaultHours]
+          : 12;
       const formatted = expirationDateTime
-        .plus({ hours: data[kStorageDefaultHours] })
+        .plus({ hours: defaultExpiry })
         .toString();
       setExpirationDateTime(tab.id, tab.title, tab.url, formatted);
       setBadgeAndTitle(tab.id);
     });
   });
+
+  chrome.tabs.onRemoved.addListener((tab) => {});
 
   const setBadgeAndTitle = (tabId) => {
     let setBadge = true;
@@ -175,14 +181,55 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
     }
   };
 
-  chrome.tabs.onUpdated.addListener((tab) => {
-    // Seriously one API has an integer and the other an object? Seriously?
-    setBadgeAndTitle(tab);
+  chrome.tabs.onUpdated.addListener((tabId) => {
+    setBadgeAndTitle(tabId);
+    console.log(`Requesting update for ${tabId}`);
+    chrome.tabs.get(tabId, (tab) => {
+      const tabId = tab.id;
+      const tabTitle = tab.title;
+      const tabURL = tab.url;
+      expiringTabInformation[tabId][kTitleKey] = tabTitle;
+      expiringTabInformation[tabId][kURLKey] = tabURL;
+      Promise.all([
+        chrome.storage.local.set({
+          [kStorageKey]: expiringTabInformation,
+        }),
+      ])
+        .then(() => {
+          console.log("Updated URL and title for tab");
+          console.log(expiringTabInformation);
+        })
+        .catch((error) => {
+          console.log("Error saving data:", error);
+        });
+    });
+  });
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    removeTab(tabId);
   });
 
   chrome.tabs.onActivated.addListener((tab) => {
     setBadgeAndTitle(tab.tabId);
   });
+
+  const removeTab = (tabId) => {
+    console.log("Requested deletion for");
+    console.log(tabId);
+    delete expiringTabInformation[tabId];
+    Promise.all([
+      chrome.storage.local.set({
+        [kStorageKey]: expiringTabInformation,
+      }),
+    ])
+      .then(() => {
+        console.log("Deleted tab from list");
+        console.log(expiringTabInformation);
+      })
+      .catch((error) => {
+        console.log("Error saving data:", error);
+      });
+  };
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.setExpiration) {
@@ -194,21 +241,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       );
     }
     if (request.deleteTab) {
-      console.log("Requested deletion for");
-      console.log(request.deleteTab.tabId);
-      delete expiringTabInformation[request.deleteTab.tabId];
-      Promise.all([
-        chrome.storage.local.set({
-          [kStorageKey]: expiringTabInformation,
-        }),
-      ])
-        .then(() => {
-          console.log("Deleted tab from list");
-          console.log(expiringTabInformation);
-        })
-        .catch((error) => {
-          console.log("Error saving data:", error);
-        });
+      removeTab(request.deleteTab.tabId);
     }
   });
 });

@@ -36,11 +36,27 @@ td.link {
   min-width: 15%;
 }
 
+td.remaining {
+  padding-right: 1em;
+  padding-left: 2em;
+}
+
 table {
   border-collapse: collapse;
   border-spacing: 0;
 }
 
-tr {
-  border-bottom: 1px solid #c0c0c0;
+.amber {
+  color: rgba(200, 200, 0, 255);
+}
+
+.red {
+  color: rgba(255, 0, 0, 255);
+}
+
+.rounded {
+  padding: 0.1em;
+  padding-left: 0.3em;
+  padding-right: 0.3em;
+  border-radius: 3px;
 }
