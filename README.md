@@ -18,7 +18,12 @@ I take no responsibility on any data you might lose by using this extension!
 
 ---
 
-The code is not great to look at, I wrote (or more like, coerced Gemini to write) this quickly to see if I liked it. I may clean it up (and upload it properly) someday.
+The code is not great to look at, I wrote (or more like, coerced Gemini to write)
+this quickly to see if I liked it.
+
+I don't promise new releases are backward compatible. Although I will try to,
+now that I use the stored data for an overview page, I may need to change it
+and I assume I'm the only user.
 
 ---
 
@@ -26,7 +31,7 @@ The code is not great to look at, I wrote (or more like, coerced Gemini to write
 
 ---
 
-### How it looks like in Chrome
+### How it looks like in Chrome (a bit outdated, it looks better now but I didn't bother creating new screenshots yet)
 
 A tab with no expiry
 
@@ -60,6 +65,12 @@ Extension hover title
 
 I collect way too many tabs. I hope this will help me avoid that.
 
+## Bugs, etc?
+
+Sometimes pressing the quick-set buttons does not work, but I haven't found out why yet. Every time it has passed I was in the middle of something else, and on the second press it works. A small annoyance I happily pay knowing any tab I didn't really need today won't be on my computer by tomorrow morning.
+
+Otherwise, I have used this for almost a week while improving the usage experience and I have been extremely happy with it. If you use it and find improvements I'll be happy to hear it but remember this is open source, and I created this extension _for me_ on the assumption nobody else might need it. So it should fulfill my usecases, not anybody else's. The best part though is that you can fork this repository and just install your own tweaked version manually just like this one. Freedom to tinker, freedom to change!
+
 ## Installing
 
 - Clone or download (remember then to unzip) this repository somewhere
@@ -67,6 +78,10 @@ I collect way too many tabs. I hope this will help me avoid that.
 - In **Chrome > Extensions**, Enable developer mode
 - Click _Load unpacked_, then browse to where you downloaded the repository
 - Optional but recommended: pin the extension.
+
+## What about Safari?
+
+For Safari on Mac, the Safari extension converter ([here](https://developer.apple.com/documentation/safariservices/safari_web_extensions/converting_a_web_extension_for_safari)) from Apple will generate a usable extension, although the styling looks better in Chrome, even if I didn't do much in terms of styling. I might fix that. For Safari on iOS the extension kind of works, but not completely and the user experience is sub-par. But I'm positively surprised that it works at all without any effort. I might work on making it nicer on Safari, because I  use Chrome for work, but I use Safari on my personal devices (for battery reasons mostly). 
 
 ## Attribution
 
