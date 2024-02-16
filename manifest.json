@@ -4,10 +4,7 @@
   "version": "0.1",
   "description": "Automatically closes tabs on their expiration date",
   "permissions": ["activeTab", "storage", "alarms", "tabs"],
-  "options_ui": {
-    "page": "src/options.html",
-    "open_in_tab": false
-  },
+  "options_page": "src/options.html",
   "background": {
     "service_worker": "src/background.js",
     "type": "module"

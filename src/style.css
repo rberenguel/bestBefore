@@ -3,9 +3,18 @@
   src: url(../media/monoid-regular-webfont.woff);
 }
 
+:root {
+  --subtle-gray: #ccc;
+}
+
 body {
   font-family: monoid, monospace;
   font-size: 100%;
+}
+
+.compact {
+  min-width: 600px;
+  max-width: 50%;
 }
 
 #tab-info {
@@ -21,6 +30,11 @@ body {
   color: blue;
 }
 
+button {
+  border-radius: 4px;
+  border: 1px solid var(--subtle-gray);
+}
+
 button.specific {
   font-size: 75%;
   width: 100%;
@@ -28,6 +42,33 @@ button.specific {
 
 button.delete {
   margin-left: 2em;
+}
+
+thead {
+  border-bottom: 2px solid var(--subtle-gray);
+  font-size: 110%;
+}
+thead:after {
+  line-height: 0.3em;
+  content: "\200C";
+  display: block;
+}
+
+tbody:before {
+  line-height: 0.4em;
+  content: "\200C";
+  display: block;
+}
+
+tbody {
+  padding-top: 2em;
+  border-bottom: 2px solid var(--subtle-gray);
+}
+
+tbody:after {
+  line-height: 0.5em;
+  content: "\200C";
+  display: block;
 }
 
 td.link {
@@ -39,6 +80,11 @@ td.link {
 td.remaining {
   padding-right: 1em;
   padding-left: 2em;
+  text-align: center;
+}
+
+td.expiry {
+  text-align: center;
 }
 
 table {

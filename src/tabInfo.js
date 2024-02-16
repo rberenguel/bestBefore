@@ -33,12 +33,11 @@ function getColorString(value) {
   return `rgba(${r}, ${g}, ${b}, 1.0)`;
 }
 
-
 chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   const expiringTabInformation = storedData[kStorageKey];
 
   // TODO(me) Copied this verbatim from background.js, can I get the common parts out?
-  const getRemainingRow = (tabId) => {
+  const getRemainingCell = (tabId) => {
     const currentTime = DateTime.now();
     let expirationDate = undefined;
     if (
@@ -48,7 +47,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       expirationDate = expiringTabInformation[tabId][kExpirationKey];
     }
     if (expirationDate == kForeverTab) {
-      return "";
+      return "<td class='remaining'></td>";
     }
 
     if (expirationDate) {
@@ -56,17 +55,21 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       const diff = expirationDateTime
         .diff(currentTime, ["months", "days", "hours", "minutes"])
         .toObject();
-   
-        const diffMinutes = expirationDateTime
+
+      const diffMinutes = expirationDateTime
         .diff(currentTime, "minutes")
         .toObject().minutes;
-        let alertColor = "";
-        if(diffMinutes < 720){
-          alertColor = `style='background-color: ${getColorString(diffMinutes)};'`;
-        }
-      return `<td class='remaining'><span class='rounded' ${alertColor}>${diff.months} M, ${diff.days} d, ${
-        diff.hours
-      } h, ${Math.floor(diff.minutes)} m</span></td>`;
+      let alertColor = "";
+      if (diffMinutes < 720) {
+        alertColor = `style='background-color: ${getColorString(
+          diffMinutes
+        )};'`;
+      }
+      return `<td class='remaining'><span class='rounded' ${alertColor}>${
+        diff.months
+      } M, ${diff.days} d, ${diff.hours} h, ${Math.floor(
+        diff.minutes
+      )} m</span></td>`;
     }
   };
   Object.keys(expiringTabInformation).forEach((tabId) => {
@@ -89,28 +92,36 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       chrome.runtime.sendMessage({ deleteTab: { tabId } });
       document.getElementById(rowFor(tabId)).remove();
     }
-    const buttonId = `delete-${tabId}`;
+    function switchToTab(tabId) {
+      console.log(`Switching to tab ${tabId}`);
+      chrome.tabs.update(+tabId, { active: true });
+    }
+    const deleteButtonId = `delete-${tabId}`;
+    const switchButtonId = `switch-${tabId}`;
     let formatted = "Does not expire";
     if (tabInformation[kExpirationKey] !== kForeverTab) {
       formatted = DateTime.fromISO(
         tabInformation[kExpirationKey]
       ).toLocaleString(DateTime.DATETIME_MED);
     }
- 
+
     row.innerHTML = `
-      <td>${tabId}</td>
+      <td><button title='Switch to this tab' id='${switchButtonId}'>${tabId}</button></td>
       <td class='link'>${link}</a></td>
       <td class='expiry'>${formatted}</td>
-      ${getRemainingRow(tabId)}
+      ${getRemainingCell(tabId)}
       <td>
-        <button id='${buttonId}' class='delete'>&#10060;</button>
+        <button id='${deleteButtonId}' class='delete'>&#10060;</button>
       </td>
     `;
     row.id = rowFor(tabId);
     const tableBody = document.getElementById("tabInfoTable");
     tableBody.appendChild(row);
-    document.getElementById(buttonId).addEventListener("click", () => {
+    document.getElementById(deleteButtonId).addEventListener("click", () => {
       deleteTab(tabId);
+    });
+    document.getElementById(switchButtonId).addEventListener("click", () => {
+      switchToTab(tabId);
     });
   });
 });
