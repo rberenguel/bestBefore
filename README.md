@@ -18,12 +18,19 @@ I take no responsibility on any data you might lose by using this extension!
 
 ---
 
+## Caveats
+
 The code is not great to look at, I wrote (or more like, coerced Gemini to write)
 this quickly to see if I liked it.
 
 I don't promise new releases are backward compatible. Although I will try to,
 now that I use the stored data for an overview page, I may need to change it
 and I assume I'm the only user.
+
+**IMPORTANT**: expiries are not conserved after a browser restart. When Chrome restarts,
+tabs will have _no_ expiry. I don't plan on fixing this, because it is hairy (would need
+to depend on URL, and I don't want that). I will later add a note to the tab view page
+informing of tabs that are "gone" from Chrome.
 
 ---
 
