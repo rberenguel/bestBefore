@@ -27,10 +27,18 @@ I don't promise new releases are backward compatible. Although I will try to,
 now that I use the stored data for an overview page, I may need to change it
 and I assume I'm the only user.
 
-**IMPORTANT**: expiries are not conserved after a browser restart. When Chrome restarts,
+> [!IMPORTANT]  
+
+> Expiries are not conserved after a browser restart. When Chrome restarts,
 tabs will have _no_ expiry. I don't plan on fixing this, because it is hairy (would need
 to depend on URL, and I don't want that). I will later add a note to the tab view page
 informing of tabs that are "gone" from Chrome.
+
+> [!ALERT]
+
+> Default expiries also apply to "apps" that are actually skins of Chrome (i.e. they provide
+> access to extensions). So, if you see some app strangely close itself check if it has some
+> sort of extensions menu hidden, or whether it shows as a tab in the Tab Information page.
 
 ---
 
@@ -94,4 +102,5 @@ For Safari on Mac, the Safari extension converter ([here](https://developer.appl
 
 - The icon is an image [by macrovector](https://www.freepik.com/free-vector/bar-qr-codes-white-stickers-set-label-information-data-identification-strip_10602030.htm#query=barcode&position=0&from_view=keyword&track=sph&uuid=d878575d-8b03-4d9c-bc19-52617e9d7f4b) on Freepik
 - Uses the [luxon.js](https://moment.github.io/luxon/#/) datetime library
+- Uses the [sortable.js](https://github.com/HubSpot/sortable) table sorting library
 - Many thanks to [Google Gemini](http://gemini.google.com") for the help.

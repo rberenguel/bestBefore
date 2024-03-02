@@ -3,6 +3,8 @@
   <head>
     <title>Best before list of tabs</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../lib/sortable-min-theme.css" />
+    <script src="../lib/sortable.js"></script>
   </head>
   <body class="compact">
   <h2>Best before</h2>
@@ -17,7 +19,7 @@
     <p>By clicking on the tab id button you can switch to that specific tab.</p>
   </div>
   <body>
-    <table border="0">
+    <table id="tabInfoTableContainer" border="0" class="sortable-theme-bootstrap" data-sortable>
       <thead>
         <tr>
           <th>Tab ID</th>

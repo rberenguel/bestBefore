@@ -123,5 +123,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
     document.getElementById(switchButtonId).addEventListener("click", () => {
       switchToTab(tabId);
     });
+    const tabInfoTableContainer = document.getElementById("tabInfoTableContainer");
+    Sortable.initTable(tabInfoTableContainer)
   });
 });
