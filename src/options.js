@@ -4,7 +4,8 @@ const defaultHoursSelector = document.getElementById("default-hours");
 
 chrome.storage.sync.get([kStorageDefaultHours], (data) => {
   const savedValue = data[kStorageDefaultHours];
-  console.log(savedValue);
+  console.info("Saved default value")
+  console.debug(savedValue);
   const defaultValue = 12;
   const initialValue =
     savedValue && savedValue !== "" ? savedValue : defaultValue;
@@ -18,7 +19,7 @@ defaultHoursSelector.addEventListener("change", function (event) {
     if (chrome.runtime.lastError) {
       console.error("Error saving settings:", chrome.runtime.lastError);
     } else {
-      console.log("Settings saved successfully!");
+      console.info("Settings saved successfully!");
     }
   });
 });

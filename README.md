@@ -28,15 +28,16 @@ now that I use the stored data for an overview page, I may need to change it
 and I assume I'm the only user.
 
 > [!IMPORTANT]  
-> Expiries are not conserved after a browser restart. When Chrome restarts,
-tabs will have _no_ expiry. I don't plan on fixing this, because it is hairy (would need
-to depend on URL, and I don't want that). I will later add a note to the tab view page
-informing of tabs that are "gone" from Chrome.
+> When Chrome gets updated or restarts (and you "restore all tabs"), tab ids are lost. Every time
+> you open the tab info page (the "i" link in the extension popup) and once every minute I run
+> a naive reconciliation, that tries to match tabs that had an expiry on them with what is available
+> in storage, by URL. On a match, I update the real existing tab with that information (and delete the
+> old entry). This _should_ work well enough, but keep it in mind.
 
 > [!CAUTION]
 > Default expiries also apply to "apps" that are actually skins of Chrome (i.e. they provide
 > access to extensions). So, if you see some app strangely close itself check if it has some
-> sort of extensions menu hidden, or whether it shows as a tab in the Tab Information page.
+> sort of extensions menu hidden, or whether it shows as a tab in the `Tab Information` page.
 
 ---
 
@@ -44,7 +45,7 @@ informing of tabs that are "gone" from Chrome.
 
 ---
 
-### How it looks like in Chrome (a bit outdated, it looks better now but I didn't bother creating new screenshots yet)
+### How it looks like in Chrome (a bit outdated, it looks better now, but I didn't bother creating new screenshots yet)
 
 A tab with no expiry
 
@@ -78,7 +79,7 @@ Extension hover title
 
 I collect way too many tabs. I hope this will help me avoid that.
 
-## Bugs, etc?
+## Bugs, etc.?
 
 Sometimes pressing the quick-set buttons does not work, but I haven't found out why yet. Every time it has passed I was in the middle of something else, and on the second press it works. A small annoyance I happily pay knowing any tab I didn't really need today won't be on my computer by tomorrow morning.
 

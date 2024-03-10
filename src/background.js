@@ -7,6 +7,7 @@ import {
   kURLKey,
   kStorageDefaultHours,
   kForeverTab,
+  refreshWithOldInfo
 } from "./common.js";
 
 chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
@@ -14,6 +15,20 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
 
   chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
   chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
+  chrome.alarms.create("purgeAndRematchTabs", {periodInMinutes: 1});
+
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "purgeAndRematchTabs") {
+      // This is also done when opening the info page.
+      console.info("Reconciling existing and expiring tabs")
+      chrome.tabs.query({}, (existingTabs) => {
+        Object.keys(expiringTabInformation).forEach((tabId) => {
+          const tabInformation = expiringTabInformation[tabId];
+          refreshWithOldInfo(tabId, existingTabs, tabInformation)
+        });
+      });
+    }
+  });
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "updateBadge") {
@@ -34,19 +49,19 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
           return;
         }
         const expirationTime = DateTime.fromISO(tabInformation[kExpirationKey]);
-        console.log(
+        console.debug(
           `Comparing ${expirationTime} with ${currentTime} for ${tabId}`
         );
         if (currentTime >= expirationTime) {
           chrome.tabs
             .get(+tabId)
             .then((tab) => {
-              console.log(`Closing expired tab: ${tab.title}`);
+              console.info(`Closing expired tab: ${tab.title}`);
               chrome.tabs.remove(tab.id);
               delete expiringTabInformation[tabId];
             })
             .catch((error) => {
-              console.log("Error getting tab. Purging from list.", error);
+              console.error("Error getting tab. Purging from list.", error);
               delete expiringTabInformation[tabId];
             });
         }
@@ -76,17 +91,17 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         }),
       ])
         .then(() => {
-          console.log(
-            "Expiration date and tab information saved successfully."
+          console.info(
+            "Expiration date and tab information saved successfully:"
           );
-          console.log(expiringTabInformation);
+          console.debug(expiringTabInformation);
           setBadgeAndTitle(tabId);
         })
         .catch((error) => {
-          console.log("Error saving data:", error);
+          console.error("Error saving data:", error);
         });
     } else {
-      console.log("Invalid expiration date format");
+      console.error("Invalid expiration date format");
     }
   };
 
@@ -165,12 +180,17 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         }
       }
       if (setBadge) {
-        console.log(`Setting badge for ${tabId} with ${count}${abbr}`);
+        console.info(`Setting badge for ${tabId} with ${count}${abbr}`);
         chrome.action.setBadgeText({ tabId: tabId, text: `${count}${abbr}` });
         chrome.action.setBadgeBackgroundColor({ tabId: tabId, color: color });
       } else {
-        console.log(`Setting badge for ${tabId} with empty`);
-        chrome.action.setBadgeText({ tabId: tabId, text: "" });
+        console.info(`Setting badge for ${tabId} with empty`);
+        try {
+          chrome.action.setBadgeText({ tabId: tabId, text: "" });
+        } catch {
+          console.error(`Can't set the badge for tab $tabId`);
+        }
+        
       }
       chrome.action.setTitle({
         tabId: tabId,
@@ -183,7 +203,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
 
   chrome.tabs.onUpdated.addListener((tabId) => {
     setBadgeAndTitle(tabId);
-    console.log(`Requesting update for ${tabId}`);
+    console.debug(`Requesting update for ${tabId}`);
     chrome.tabs.get(tabId, (tab) => {
       const tabId = tab.id;
       const tabTitle = tab.title;
@@ -196,11 +216,11 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         }),
       ])
         .then(() => {
-          console.log("Updated URL and title for tab");
-          console.log(expiringTabInformation);
+          console.info("Updated URL and title for tab");
+          console.debug(expiringTabInformation);
         })
         .catch((error) => {
-          console.log("Error saving data:", error);
+          console.error("Error saving data:", error);
         });
     });
   });
@@ -214,8 +234,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   });
 
   const removeTab = (tabId) => {
-    console.log("Requested deletion for");
-    console.log(tabId);
+    console.info(`Requested deletion for ${tabId}`);
     delete expiringTabInformation[tabId];
     Promise.all([
       chrome.storage.local.set({
@@ -223,11 +242,11 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       }),
     ])
       .then(() => {
-        console.log("Deleted tab from list");
-        console.log(expiringTabInformation);
+        console.info("Deleted tab from list");
+        console.debug(expiringTabInformation);
       })
       .catch((error) => {
-        console.log("Error saving data:", error);
+        console.error("Error saving data:", error);
       });
   };
 
