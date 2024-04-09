@@ -38,6 +38,8 @@ and I assume I'm the only user.
 > Default expiries also apply to "apps" that are actually skins of Chrome (i.e. they provide
 > access to extensions). So, if you see some app strangely close itself check if it has some
 > sort of extensions menu hidden, or whether it shows as a tab in the `Tab Information` page.
+> I have added a "catch" for tabs created in such apps, and they _should_ get "forever" as
+> duration, but I'm not 100% sure how reliable the trick is.
 
 ---
 

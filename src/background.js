@@ -7,7 +7,7 @@ import {
   kURLKey,
   kStorageDefaultHours,
   kForeverTab,
-  refreshWithOldInfo
+  refreshWithOldInfo,
 } from "./common.js";
 
 chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
@@ -15,16 +15,16 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
 
   chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
   chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
-  chrome.alarms.create("purgeAndRematchTabs", {periodInMinutes: 1});
+  chrome.alarms.create("purgeAndRematchTabs", { periodInMinutes: 1 });
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "purgeAndRematchTabs") {
       // This is also done when opening the info page.
-      console.info("Reconciling existing and expiring tabs")
+      console.info("Reconciling existing and expiring tabs");
       chrome.tabs.query({}, (existingTabs) => {
         Object.keys(expiringTabInformation).forEach((tabId) => {
           const tabInformation = expiringTabInformation[tabId];
-          refreshWithOldInfo(tabId, existingTabs, tabInformation)
+          refreshWithOldInfo(tabId, existingTabs, tabInformation);
         });
       });
     }
@@ -106,17 +106,28 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   };
 
   chrome.tabs.onCreated.addListener((tab) => {
-    chrome.storage.sync.get([kStorageDefaultHours], (data) => {
-      const expirationDateTime = DateTime.now();
-      const defaultExpiry =
-        data[kStorageDefaultHours] && data[kStorageDefaultHours] !== ""
-          ? data[kStorageDefaultHours]
-          : 12;
-      const formatted = expirationDateTime
-        .plus({ hours: defaultExpiry })
-        .toString();
-      setExpirationDateTime(tab.id, tab.title, tab.url, formatted);
-      setBadgeAndTitle(tab.id);
+    chrome.tabs.query({ active: true, currentWindow: true, windowType: "app" }, (tabsInApps) => {
+      console.debug(tabsInApps)
+      const tabIds = tabsInApps.map(t => t.id)
+      console.debug(tabIds)
+      if(tabIds.includes(tab.id)){
+        console.info(`Skipping tab ${tab.id} (${tab.title}, ${tab.url}) because it is part of a Chrome app. Setting it as "forever"`)
+        setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+        setBadgeAndTitle(tab.id);
+        return
+      }
+      chrome.storage.sync.get([kStorageDefaultHours], (data) => {
+        const expirationDateTime = DateTime.now();
+        const defaultExpiry =
+          data[kStorageDefaultHours] && data[kStorageDefaultHours] !== ""
+            ? data[kStorageDefaultHours]
+            : 12;
+        const formatted = expirationDateTime
+          .plus({ hours: defaultExpiry })
+          .toString();
+        setExpirationDateTime(tab.id, tab.title, tab.url, formatted);
+        setBadgeAndTitle(tab.id);
+      });
     });
   });
 
@@ -190,7 +201,6 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         } catch {
           console.error(`Can't set the badge for tab $tabId`);
         }
-        
       }
       chrome.action.setTitle({
         tabId: tabId,
