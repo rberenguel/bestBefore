@@ -8,6 +8,7 @@ import {
   kStorageDefaultHours,
   kForeverTab,
   refreshWithOldInfo,
+  findMatchingTabIdForURL,
 } from "./common.js";
 
 chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
@@ -106,29 +107,49 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   };
 
   chrome.tabs.onCreated.addListener((tab) => {
-    chrome.tabs.query({ active: true, currentWindow: true, windowType: "app" }, (tabsInApps) => {
-      console.debug(tabsInApps)
-      const tabIds = tabsInApps.map(t => t.id)
-      console.debug(tabIds)
-      if(tabIds.includes(tab.id)){
-        console.info(`Skipping tab ${tab.id} (${tab.title}, ${tab.url}) because it is part of a Chrome app. Setting it as "forever"`)
-        setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
-        setBadgeAndTitle(tab.id);
-        return
-      }
-      chrome.storage.sync.get([kStorageDefaultHours], (data) => {
-        const expirationDateTime = DateTime.now();
-        const defaultExpiry =
-          data[kStorageDefaultHours] && data[kStorageDefaultHours] !== ""
-            ? data[kStorageDefaultHours]
-            : 12;
-        const formatted = expirationDateTime
-          .plus({ hours: defaultExpiry })
-          .toString();
-        setExpirationDateTime(tab.id, tab.title, tab.url, formatted);
-        setBadgeAndTitle(tab.id);
+    chrome.tabs.query(
+      { active: true, currentWindow: true, windowType: "app" },
+      (tabsInApps) => {
+        const tabIds = tabsInApps.map((t) => t.id);
+        if (tabIds.includes(tab.id)) {
+          console.info(
+            `Skipping tab ${tab.id} (${tab.title}, ${tab.url}) because it is part of a Chrome app. Setting it as "forever"`
+          );
+          setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+          setBadgeAndTitle(tab.id);
+          return;
+        }
+        const reformatted = Object.entries(expiringTabInformation).map(([id, tab]) => {
+          return { 
+              url: tab[kURLKey],
+              id: id
+           };
       });
-    });
+        const existingId = findMatchingTabIdForURL(
+          tab.url,
+          reformatted
+        );
+        if (existingId) {
+          console.info("This tab already existed, using same expiry")
+          const expiration = expiringTabInformation[existingId][kExpirationKey];
+          setExpirationDateTime(tab.id, tab.title, tab.url, expiration);
+          setBadgeAndTitle(tab.id);
+        } else {
+          chrome.storage.sync.get([kStorageDefaultHours], (data) => {
+            const expirationDateTime = DateTime.now();
+            const defaultExpiry =
+              data[kStorageDefaultHours] && data[kStorageDefaultHours] !== ""
+                ? data[kStorageDefaultHours]
+                : 12;
+            const formatted = expirationDateTime
+              .plus({ hours: defaultExpiry })
+              .toString();
+            setExpirationDateTime(tab.id, tab.title, tab.url, formatted);
+            setBadgeAndTitle(tab.id);
+          });
+        }
+      }
+    );
   });
 
   chrome.tabs.onRemoved.addListener((tab) => {});
