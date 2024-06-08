@@ -6,7 +6,7 @@ import {
   kTitleKey,
   kStorageKey,
   kForeverTab,
-  refreshWithOldInfo
+  refreshWithOldInfo,
 } from "./common.js";
 
 function getColorString(value) {
@@ -62,13 +62,13 @@ chrome.tabs.query({}, (existingTabs) => {
         let alertColor = "";
         if (diffMinutes < 720) {
           alertColor = `style='background-color: ${getColorString(
-            diffMinutes
+            diffMinutes,
           )};'`;
         }
         return `<td class='remaining'><span class='rounded' ${alertColor}>${
           diff.months
         } M, ${diff.days} d, ${diff.hours} h, ${Math.floor(
-          diff.minutes
+          diff.minutes,
         )} m</span></td>`;
       }
     };
@@ -95,7 +95,7 @@ chrome.tabs.query({}, (existingTabs) => {
         console.info(`Switching to tab ${tabId}`);
         chrome.tabs.update(+tabId, { active: true });
       }
-      if(refreshWithOldInfo(tabId, existingTabs, expiringTabInformation)){
+      if (refreshWithOldInfo(tabId, existingTabs, expiringTabInformation)) {
         row.classList.add("nonexistent");
       }
       const deleteButtonId = `delete-${tabId}`;
@@ -103,7 +103,7 @@ chrome.tabs.query({}, (existingTabs) => {
       let formatted = "Does not expire";
       if (tabInformation[kExpirationKey] !== kForeverTab) {
         formatted = DateTime.fromISO(
-          tabInformation[kExpirationKey]
+          tabInformation[kExpirationKey],
         ).toLocaleString(DateTime.DATETIME_MED);
       }
 
@@ -126,7 +126,7 @@ chrome.tabs.query({}, (existingTabs) => {
         switchToTab(tabId);
       });
       const tabInfoTableContainer = document.getElementById(
-        "tabInfoTableContainer"
+        "tabInfoTableContainer",
       );
       Sortable.initTable(tabInfoTableContainer);
     });

@@ -4,7 +4,7 @@ const defaultHoursSelector = document.getElementById("default-hours");
 
 chrome.storage.sync.get([kStorageDefaultHours], (data) => {
   const savedValue = data[kStorageDefaultHours];
-  console.info("Saved default value")
+  console.info("Saved default value");
   console.debug(savedValue);
   const defaultValue = 12;
   const initialValue =

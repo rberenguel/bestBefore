@@ -97,7 +97,7 @@ Otherwise, I have used this for almost a week while improving the usage experien
 
 ## What about Safari?
 
-For Safari on Mac, the Safari extension converter ([here](https://developer.apple.com/documentation/safariservices/safari_web_extensions/converting_a_web_extension_for_safari)) from Apple will generate a usable extension, although the styling looks better in Chrome, even if I didn't do much in terms of styling. I might fix that. For Safari on iOS the extension kind of works, but not completely and the user experience is sub-par. But I'm positively surprised that it works at all without any effort. I might work on making it nicer on Safari, because I  use Chrome for work, but I use Safari on my personal devices (for battery reasons mostly). 
+For Safari on Mac, the Safari extension converter ([here](https://developer.apple.com/documentation/safariservices/safari_web_extensions/converting_a_web_extension_for_safari)) from Apple will generate a usable extension, although the styling looks better in Chrome, even if I didn't do much in terms of styling. I might fix that. For Safari on iOS the extension kind of works, but not completely and the user experience is sub-par. But I'm positively surprised that it works at all without any effort. I might work on making it nicer on Safari, because I use Chrome for work, but I use Safari on my personal devices (for battery reasons mostly).
 
 ## Attribution
 

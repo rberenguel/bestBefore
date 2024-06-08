@@ -51,7 +51,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         }
         const expirationTime = DateTime.fromISO(tabInformation[kExpirationKey]);
         console.debug(
-          `Comparing ${expirationTime} with ${currentTime} for ${tabId}`
+          `Comparing ${expirationTime} with ${currentTime} for ${tabId}`,
         );
         if (currentTime >= expirationTime) {
           chrome.tabs
@@ -78,7 +78,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
     tabId,
     tabTitle,
     tabURL,
-    expirationDateTime
+    expirationDateTime,
   ) => {
     if (isValidDateTime(expirationDateTime)) {
       expiringTabInformation[tabId] = {
@@ -93,7 +93,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       ])
         .then(() => {
           console.info(
-            "Expiration date and tab information saved successfully:"
+            "Expiration date and tab information saved successfully:",
           );
           console.debug(expiringTabInformation);
           setBadgeAndTitle(tabId);
@@ -113,24 +113,23 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         const tabIds = tabsInApps.map((t) => t.id);
         if (tabIds.includes(tab.id)) {
           console.info(
-            `Skipping tab ${tab.id} (${tab.title}, ${tab.url}) because it is part of a Chrome app. Setting it as "forever"`
+            `Skipping tab ${tab.id} (${tab.title}, ${tab.url}) because it is part of a Chrome app. Setting it as "forever"`,
           );
           setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
           setBadgeAndTitle(tab.id);
           return;
         }
-        const reformatted = Object.entries(expiringTabInformation).map(([id, tab]) => {
-          return { 
+        const reformatted = Object.entries(expiringTabInformation).map(
+          ([id, tab]) => {
+            return {
               url: tab[kURLKey],
-              id: id
-           };
-      });
-        const existingId = findMatchingTabIdForURL(
-          tab.url,
-          reformatted
+              id: id,
+            };
+          },
         );
+        const existingId = findMatchingTabIdForURL(tab.url, reformatted);
         if (existingId) {
-          console.info("This tab already existed, using same expiry")
+          console.info("This tab already existed, using same expiry");
           const expiration = expiringTabInformation[existingId][kExpirationKey];
           setExpirationDateTime(tab.id, tab.title, tab.url, expiration);
           setBadgeAndTitle(tab.id);
@@ -148,7 +147,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
             setBadgeAndTitle(tab.id);
           });
         }
-      }
+      },
     );
   });
 
@@ -287,7 +286,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         request.setExpiration.tabId,
         request.setExpiration.tabTitle,
         request.setExpiration.tabURL,
-        request.setExpiration.chosenDateTime
+        request.setExpiration.chosenDateTime,
       );
     }
     if (request.deleteTab) {
