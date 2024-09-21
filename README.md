@@ -3,7 +3,23 @@
 > This extension adds an expiry date to tabs: **when they expire they are
 > automatically closed**.
 
-## What is this?
+<!-- vscode-markdown-toc -->
+* [What is this?](#Whatisthis)
+* [Caveats](#Caveats)
+	* [How it looks like in Chrome (a bit outdated, it looks better now, but I didn't bother creating new screenshots yet)](#HowitlookslikeinChromeabitoutdateditlooksbetternowbutIdidntbothercreatingnewscreenshotsyet)
+* [Why?](#Why)
+* [Bugs, etc.?](#Bugsetc.)
+* [Installing](#Installing)
+* [What about Safari?](#WhataboutSafari)
+* [Attribution](#Attribution)
+
+<!-- vscode-markdown-toc-config
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+
+## <a name='Whatisthis'></a>What is this?
 
 By activating the extension you can customise the expiry of a particular
 tab, or set a tab as never expiring. Pinned tabs and tabs in Chrome web apps
@@ -23,7 +39,7 @@ it will stop rounding up and show in red, in case you need to extend it.
 
 ---
 
-## Caveats
+## <a name='Caveats'></a>Caveats
 
 The code is not great to look at, I wrote (or more like, coerced Gemini to write)
 this quickly to see if I liked it. It has gone through several iterations to make it better, since I have it always in use at work.
@@ -50,7 +66,7 @@ I don't promise new releases are backward compatible. Although I will try to, I 
 
 ---
 
-### How it looks like in Chrome (a bit outdated, it looks better now, but I didn't bother creating new screenshots yet)
+### <a name='HowitlookslikeinChromeabitoutdateditlooksbetternowbutIdidntbothercreatingnewscreenshotsyet'></a>How it looks like in Chrome (a bit outdated, it looks better now, but I didn't bother creating new screenshots yet)
 
 A tab with no expiry
 
@@ -80,17 +96,17 @@ Extension hover title
 
 ![](images/Hover.png)
 
-## Why?
+## <a name='Why'></a>Why?
 
 I collect way too many tabs. I hope this will help me avoid that.
 
-## Bugs, etc.?
+## <a name='Bugsetc.'></a>Bugs, etc.?
 
 Sometimes pressing the quick-set buttons does not work, but I haven't found out why yet. Every time it has happened I was in the middle of something else, and on the second press it works. A small annoyance I happily pay knowing any tab I didn't really need today won't be on my computer by tomorrow morning. Setting a tab to forever does not dismiss the setter window. I haven't bothered checking why yet, since I rarely set any tab to forever.
 
 Otherwise, I have used this for many months while improving the usage experience and I have been extremely happy with it. If you use it and find improvements I'll be happy to hear it but remember this is open source, and I created this extension _for me_ on the assumption nobody else might need it. So it should fulfill my usecases, not anybody else's. The best part though is that you can fork this repository and just install your own tweaked version manually just like this one. Freedom to tinker, freedom to change!
 
-## Installing
+## <a name='Installing'></a>Installing
 
 - Clone or download (remember then to unzip) this repository somewhere.
 - In **Chrome**, _More tools > Extensions_…
@@ -98,11 +114,11 @@ Otherwise, I have used this for many months while improving the usage experience
 - Click _Load unpacked_, then browse to where you downloaded the repository
 - Optional but recommended: **pin the extension**.
 
-## What about Safari?
+## <a name='WhataboutSafari'></a>What about Safari?
 
 For Safari on Mac, the Safari extension converter ([here](https://developer.apple.com/documentation/safariservices/safari_web_extensions/converting_a_web_extension_for_safari)) from Apple will generate a usable extension, although the styling looks better in Chrome, even if I didn't do much in terms of styling. I might fix that. For Safari on iOS the extension kind of works, but not completely and the user experience is sub-par. But I'm positively surprised that it works at all without any effort. I might work on making it nicer on Safari, because I use Chrome for work but I use Safari on my personal devices (for battery reasons mostly).
 
-## Attribution
+## <a name='Attribution'></a>Attribution
 
 - The icon is an image [by macrovector](https://www.freepik.com/free-vector/bar-qr-codes-white-stickers-set-label-information-data-identification-strip_10602030.htm#query=barcode&position=0&from_view=keyword&track=sph&uuid=d878575d-8b03-4d9c-bc19-52617e9d7f4b) on Freepik
 - Uses the [luxon.js](https://moment.github.io/luxon/#/) datetime library
