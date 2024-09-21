@@ -12,7 +12,10 @@
       <p>
         Here you can see the expiries of all tabs currently stored, as well as
         delete any <em>expiry</em> that may look weird. So, the red cross won't
-        delete a tab, but the expiry date related to it.
+        delete a tab, but the expiry date related to it. Tabs present in the expiry
+        list internally but not in Chrome have been styled as `display: none`, 
+        removing this styling will let you interact with those (mostly used for
+        debugging).
       </p>
 
       <p>
@@ -21,7 +24,7 @@
       </p>
 
       <p>
-        By clicking on the tab id button you can switch to that specific tab.
+        By clicking on the tab id button you can switch to that specific tab. If the tab is in another window though, window focus won't change.
       </p>
     </div>
     <table
