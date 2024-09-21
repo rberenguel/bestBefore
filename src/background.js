@@ -11,12 +11,37 @@ import {
   findMatchingTabIdForURL,
 } from "./common.js";
 
+/*
+
+The expected workflow is the following:
+
+- Tab added / created in browser:
+    - Exists in memory?
+    - If yes: ok, fine
+    - If no: add it, with the default deadline
+
+- Tab in memory:
+    - Has it expired?
+    - If yes: delete it
+    - If no: Does it exist in the browser?
+        - If yes, fine
+        - If no: This is the problematic case.
+
+We arrive to this problematic case when Chrome restarts sometimes, seems to be caused by updates, but
+not all updates seem to cause the same behaviour. purgeAndRematchTabs should (ideally) handle this case.
+
+The best option seems to be:
+
+- If the tab does not exist in the browser, increment an internal counter for the tab. Once it reaches N (say 10), delete it from memory.
+
+*/
+
 chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
   const expiringTabInformation = storedData[kStorageKey];
 
   chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
   chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
-  chrome.alarms.create("purgeAndRematchTabs", { periodInMinutes: 1 });
+  //chrome.alarms.create("purgeAndRematchTabs", { periodInMinutes: 1 });
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "purgeAndRematchTabs") {
@@ -62,8 +87,8 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
               delete expiringTabInformation[tabId];
             })
             .catch((error) => {
-              console.error("Error getting tab. Purging from list.", error);
-              delete expiringTabInformation[tabId];
+              console.error("Error getting tab. Would purge from list.", error);
+              // delete expiringTabInformation[tabId];
             });
         }
       });
@@ -85,6 +110,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
         [kExpirationKey]: expirationDateTime,
         [kTitleKey]: tabTitle,
         [kURLKey]: tabURL,
+        count: 0,
       };
       Promise.all([
         chrome.storage.local.set({
@@ -238,6 +264,9 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       const tabId = tab.id;
       const tabTitle = tab.title;
       const tabURL = tab.url;
+      if (!expiringTabInformation[tabId]) {
+        return;
+      }
       expiringTabInformation[tabId][kTitleKey] = tabTitle;
       expiringTabInformation[tabId][kURLKey] = tabURL;
       Promise.all([
@@ -280,7 +309,26 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
       });
   };
 
+  const incrementTab = (tabId) => {
+    console.info(`Requested increment for ${tabId}`);
+    expiringTabInformation[tabId].count += 1;
+    /*Promise.all([
+      chrome.storage.local.set({
+        [kStorageKey]: expiringTabInformation,
+      }),
+    ])
+      .then(() => {
+        console.info("Incremented tab count from list");
+        console.debug(expiringTabInformation);
+      })
+      .catch((error) => {
+        console.error("Error saving data:", error);
+      });*/
+  };
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log("received request");
+    console.log(request);
     if (request.setExpiration) {
       setExpirationDateTime(
         request.setExpiration.tabId,
@@ -291,6 +339,9 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
     }
     if (request.deleteTab) {
       removeTab(request.deleteTab.tabId);
+    }
+    if (request.incrementTab) {
+      incrementTab(request.incrementTab.tabId);
     }
   });
 });

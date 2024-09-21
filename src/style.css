@@ -108,5 +108,6 @@ table {
 }
 
 .nonexistent {
-  text-decoration: line-through;
+  /* text-decoration: line-through; */
+  display: none;
 }

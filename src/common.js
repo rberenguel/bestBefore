@@ -37,22 +37,34 @@ const findMatchingTabIdForURL = (url, allTabs) => {
 };
 
 const refreshWithOldInfo = (tabId, existingTabs, expiringTabInformation) => {
+  console.info(`Refreshing tab ${tabId} if possible`);
   if (!stillExists(tabId, existingTabs)) {
     console.info(`Tab with id ${tabId} no longer exists`);
+
     console.debug(expiringTabInformation);
-    const tabInformation = expiringTabInformation[tabId];
+    const tabInformation = expiringTabInformation; // The eff? [tabId]
+    if (!tabInformation) {
+      console.info("No info available: ");
+      console.log(tabInformation);
+      return true;
+    }
     const newId = findMatchingTabIdForURL(
       tabInformation[kURLKey],
       existingTabs,
     );
-    chrome.runtime.sendMessage({
-      /* After a month from adding reconciliation, I have found it does not work well and I suspect there is some 
+    //chrome.runtime.sendMessage({
+    /* After a month from adding reconciliation, I have found it does not work well and I suspect there is some 
       sort of race condition / strange situation between when tabs exist or not after a Chrome update. I think
       removing this deletion could potentially help, at least in debugging the scenario */
-      //deleteTab: { tabId },
-    });
+    //deleteTab: { tabId },
+    //});
     if (!newId) {
       // This line will need visual refresh in the tab info panel
+      //console.log("Sending increment message");
+      // For some reason this message never makes it (errors instead)
+      //chrome.runtime.sendMessage({
+      //  incrementTab: { tabId },
+      //});
       return true;
     } else {
       console.info(
