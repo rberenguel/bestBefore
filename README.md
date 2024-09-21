@@ -1,12 +1,13 @@
 # Best before
 
+> This extension adds an expiry date to tabs: **when they expire they are
+> automatically closed**.
+
 ## What is this?
 
-This extension adds an expiry date to tabs: **when they expire they are
-automatically closed**.
-
 By activating the extension you can customise the expiry of a particular
-tab, or set a tab as never expiring. Pinned tabs and tabs in Chrome web apps (things that might not look like browsers, actually) should never expire by default.
+tab, or set a tab as never expiring. Pinned tabs and tabs in Chrome web apps
+(things that might not look like browsers, actually) should never expire by default.
 By default, any new tab should get 12 hours, this default can be customised.
 
 Hover over the extension to see exactly how much time a tab has left. The
@@ -14,7 +15,11 @@ extension badge shows the "topline time left", rounding up. So, it will say
 "12 hours" when it's 11 hours 50 minutes. As soon as it goes below 60 minutes
 it will stop rounding up and show in red, in case you need to extend it.
 
-I take no responsibility on any data you might lose by using this extension!
+> [!IMPORTANT]
+> I take no responsibility on any data you might lose by using this extension!
+
+> [!NOTE]
+> Otherwise, I have been using it for many months at work, daily, with no problems.
 
 ---
 
