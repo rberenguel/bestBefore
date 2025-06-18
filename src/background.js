@@ -1,5 +1,4 @@
 import { DateTime } from "../lib/luxon.js";
-
 import {
   kExpirationKey,
   kStorageKey,
@@ -7,54 +6,97 @@ import {
   kURLKey,
   kStorageDefaultHours,
   kForeverTab,
-  refreshWithOldInfo,
-  findMatchingTabIdForURL,
 } from "./common.js";
 
-/*
+// --- Main Initialization ---
+chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
+  let expiringTabInformation = result[kStorageKey];
 
-The expected workflow is the following:
+  // Attach listeners that rely on the latest tab information
+  setupAlarms();
+  setupTabEventListeners();
+  setupMessageListener();
 
-- Tab added / created in browser:
-    - Exists in memory?
-    - If yes: ok, fine
-    - If no: add it, with the default deadline
+  // --- Core Functions ---
 
-- Tab in memory:
-    - Has it expired?
-    - If yes: delete it
-    - If no: Does it exist in the browser?
-        - If yes, fine
-        - If no: This is the problematic case.
+  function setupAlarms() {
+    chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
+    chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
+  }
 
-We arrive to this problematic case when Chrome restarts sometimes, seems to be caused by updates, but
-not all updates seem to cause the same behaviour. purgeAndRematchTabs should (ideally) handle this case.
+  function setupTabEventListeners() {
+    chrome.tabs.onCreated.addListener(handleTabCreated);
+    chrome.tabs.onUpdated.addListener(handleTabUpdated);
+    chrome.tabs.onRemoved.addListener(removeTab);
+    chrome.tabs.onActivated.addListener((activeInfo) =>
+      setBadgeAndTitle(activeInfo.tabId),
+    );
+  }
 
-The best option seems to be:
+  function setupMessageListener() {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.setExpiration) {
+        setExpirationDateTime(
+          request.setExpiration.tabId,
+          request.setExpiration.tabTitle,
+          request.setExpiration.tabURL,
+          request.setExpiration.chosenDateTime,
+        );
+      }
+      if (request.deleteTab) {
+        removeTab(request.deleteTab.tabId);
+      }
+    });
+  }
 
-- If the tab does not exist in the browser, increment an internal counter for the tab. Once it reaches N (say 10), delete it from memory.
+  // --- Reconciliation Logic on Startup ---
 
-*/
-
-chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
-  const expiringTabInformation = storedData[kStorageKey];
-
-  chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
-  chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
-  //chrome.alarms.create("purgeAndRematchTabs", { periodInMinutes: 1 });
-
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === "purgeAndRematchTabs") {
-      // This is also done when opening the info page.
-      console.info("Reconciling existing and expiring tabs");
-      chrome.tabs.query({}, (existingTabs) => {
-        Object.keys(expiringTabInformation).forEach((tabId) => {
-          const tabInformation = expiringTabInformation[tabId];
-          refreshWithOldInfo(tabId, existingTabs, tabInformation);
-        });
-      });
-    }
+  chrome.runtime.onStartup.addListener(() => {
+    console.log("Browser startup detected. Reconciling tabs.");
+    reconcileTabsOnStartup();
   });
+
+  async function reconcileTabsOnStartup() {
+    const { [kStorageKey]: oldTabInfo } =
+      await chrome.storage.local.get(kStorageKey);
+    if (!oldTabInfo || Object.keys(oldTabInfo).length === 0) {
+      return; // Nothing to reconcile
+    }
+
+    const currentTabs = await chrome.tabs.query({});
+    const newTabInfo = {};
+    const reconciledOldIds = new Set();
+
+    // Find a new home for old expiry data
+    for (const currentTab of currentTabs) {
+      const oldTabId = findBestMatchInOldInfo(
+        currentTab.url,
+        oldTabInfo,
+        reconciledOldIds,
+      );
+      if (oldTabId) {
+        newTabInfo[currentTab.id] = oldTabInfo[oldTabId];
+        reconciledOldIds.add(oldTabId);
+      }
+    }
+
+    // Replace the old data with the newly reconciled data
+    expiringTabInformation = newTabInfo;
+    await chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+    console.log("Reconciliation complete.", expiringTabInformation);
+  }
+
+  function findBestMatchInOldInfo(url, oldTabInfo, reconciledOldIds) {
+    if (!url) return null;
+    for (const oldId in oldTabInfo) {
+      if (!reconciledOldIds.has(oldId) && oldTabInfo[oldId][kURLKey] === url) {
+        return oldId;
+      }
+    }
+    return null;
+  }
+
+  // --- Event Handlers & Core Logic ---
 
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "updateBadge") {
@@ -63,290 +105,125 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
           setBadgeAndTitle(tabs[0].id);
         }
       });
-    }
-  });
-
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === "checkExpiration") {
+    } else if (alarm.name === "checkExpiration") {
       const currentTime = DateTime.now();
       Object.keys(expiringTabInformation).forEach((tabId) => {
         const tabInformation = expiringTabInformation[tabId];
-        if (tabInformation[kExpirationKey] == kForeverTab) {
+        if (tabInformation[kExpirationKey] === kForeverTab) {
           return;
         }
         const expirationTime = DateTime.fromISO(tabInformation[kExpirationKey]);
-        console.debug(
-          `Comparing ${expirationTime} with ${currentTime} for ${tabId}`,
-        );
         if (currentTime >= expirationTime) {
-          chrome.tabs
-            .get(+tabId)
-            .then((tab) => {
-              console.info(`Closing expired tab: ${tab.title}`);
-              chrome.tabs.remove(tab.id);
-              delete expiringTabInformation[tabId];
-            })
-            .catch((error) => {
-              console.error("Error getting tab. Would purge from list.", error);
-              // delete expiringTabInformation[tabId];
-            });
+          chrome.tabs.remove(Number(tabId)).catch(() => {});
         }
-      });
-
-      chrome.storage.local.set({
-        [kStorageKey]: expiringTabInformation,
       });
     }
   });
 
-  const setExpirationDateTime = (
-    tabId,
-    tabTitle,
-    tabURL,
-    expirationDateTime,
-  ) => {
-    if (isValidDateTime(expirationDateTime)) {
-      expiringTabInformation[tabId] = {
-        [kExpirationKey]: expirationDateTime,
-        [kTitleKey]: tabTitle,
-        [kURLKey]: tabURL,
-        count: 0,
-      };
-      Promise.all([
-        chrome.storage.local.set({
-          [kStorageKey]: expiringTabInformation,
-        }),
-      ])
-        .then(() => {
-          console.info(
-            "Expiration date and tab information saved successfully:",
-          );
-          console.debug(expiringTabInformation);
-          setBadgeAndTitle(tabId);
-        })
-        .catch((error) => {
-          console.error("Error saving data:", error);
-        });
-    } else {
-      console.error("Invalid expiration date format");
-    }
-  };
+  async function handleTabCreated(tab) {
+    if (!tab.id || expiringTabInformation[tab.id]) return;
 
-  chrome.tabs.onCreated.addListener((tab) => {
-    chrome.tabs.query(
-      { active: true, currentWindow: true, windowType: "app" },
-      (tabsInApps) => {
-        const tabIds = tabsInApps.map((t) => t.id);
-        if (tabIds.includes(tab.id)) {
-          console.info(
-            `Skipping tab ${tab.id} (${tab.title}, ${tab.url}) because it is part of a Chrome app. Setting it as "forever"`,
-          );
+    // Check if it's an app window
+    if (tab.windowId) {
+      try {
+        const win = await chrome.windows.get(tab.windowId);
+        if (win.type === "app") {
           setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
-          setBadgeAndTitle(tab.id);
           return;
         }
-        const reformatted = Object.entries(expiringTabInformation).map(
-          ([id, tab]) => {
-            return {
-              url: tab[kURLKey],
-              id: id,
-            };
-          },
-        );
-        const existingId = findMatchingTabIdForURL(tab.url, reformatted);
-        if (existingId) {
-          console.info("This tab already existed, using same expiry");
-          const expiration = expiringTabInformation[existingId][kExpirationKey];
-          setExpirationDateTime(tab.id, tab.title, tab.url, expiration);
-          setBadgeAndTitle(tab.id);
-        } else {
-          chrome.storage.sync.get([kStorageDefaultHours], (data) => {
-            const expirationDateTime = DateTime.now();
-            const defaultExpiry =
-              data[kStorageDefaultHours] && data[kStorageDefaultHours] !== ""
-                ? data[kStorageDefaultHours]
-                : 12;
-            const formatted = expirationDateTime
-              .plus({ hours: defaultExpiry })
-              .toString();
-            setExpirationDateTime(tab.id, tab.title, tab.url, formatted);
-            setBadgeAndTitle(tab.id);
-          });
-        }
-      },
-    );
-  });
-
-  chrome.tabs.onRemoved.addListener((tab) => {});
-
-  const setBadgeAndTitle = (tabId) => {
-    let setBadge = true;
-    let color = [0, 0, 0, 0];
-    const currentTime = DateTime.now();
-    let expirationDate = undefined;
-    if (
-      tabId in expiringTabInformation &&
-      kExpirationKey in expiringTabInformation[tabId]
-    ) {
-      expirationDate = expiringTabInformation[tabId][kExpirationKey];
+      } catch (e) {
+        /* window might be gone */
+      }
     }
-    if (expirationDate == kForeverTab) {
+
+    // Set default expiry
+    const { [kStorageDefaultHours]: defaultExpiry = 12 } =
+      await chrome.storage.sync.get(kStorageDefaultHours);
+    const expirationDateTime = DateTime.now()
+      .plus({ hours: defaultExpiry })
+      .toString();
+    setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
+  }
+
+  function handleTabUpdated(tabId, changeInfo, tab) {
+    if (changeInfo.status === "complete" && tab.url) {
+      if (expiringTabInformation[tabId]) {
+        expiringTabInformation[tabId][kTitleKey] = tab.title;
+        expiringTabInformation[tabId][kURLKey] = tab.url;
+        chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+      }
+    }
+    setBadgeAndTitle(tabId);
+  }
+
+  function setExpirationDateTime(tabId, tabTitle, tabURL, expirationDateTime) {
+    if (!tabId) return;
+    expiringTabInformation[tabId] = {
+      [kExpirationKey]: expirationDateTime,
+      [kTitleKey]: tabTitle,
+      [kURLKey]: tabURL,
+    };
+    chrome.storage.local
+      .set({ [kStorageKey]: expiringTabInformation })
+      .then(() => setBadgeAndTitle(tabId));
+  }
+
+  function removeTab(tabId) {
+    delete expiringTabInformation[tabId];
+    chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+  }
+
+  function setBadgeAndTitle(tabId) {
+    if (!tabId) return;
+
+    const tabInfo = expiringTabInformation[tabId];
+    if (!tabInfo) {
+      chrome.action.setBadgeText({ tabId, text: "" });
+      return;
+    }
+
+    const expirationDate = tabInfo[kExpirationKey];
+
+    if (expirationDate === kForeverTab) {
       chrome.action.setBadgeBackgroundColor({ color: [0, 125, 0, 100] });
       chrome.action.setTitle({ tabId: tabId, title: `This tab never expires` });
       chrome.action.setBadgeText({ tabId: tabId, text: `∞` });
       return;
     }
-    if (expirationDate) {
-      const expirationDateTime = DateTime.fromISO(expirationDate);
-      const diffMonths = expirationDateTime
-        .diff(currentTime, "months")
-        .toObject().months;
-      const diffDays = expirationDateTime
-        .diff(currentTime, "days")
-        .toObject().days;
-      const diffHours = expirationDateTime
-        .diff(currentTime, "hours")
-        .toObject().hours;
-      const diffMinutes = expirationDateTime
-        .diff(currentTime, "minutes")
-        .toObject().minutes;
-      const diff = expirationDateTime
-        .diff(currentTime, ["months", "days", "hours", "minutes"])
-        .toObject();
-      let count = Math.ceil(diffMonths);
-      let abbr = "M";
-      if (diffDays < 31) {
-        count = Math.ceil(diffDays);
-        abbr = "d";
-        if (diffHours < 24) {
-          count = Math.ceil(diffHours);
-          abbr = "h";
-          if (diffMinutes < 60) {
-            count = Math.floor(diffMinutes);
-            abbr = "m";
-          }
-          if (diffMinutes < 180) {
-            setBadge = true;
-            if (diffMinutes < 60) {
-              color = [200, 200, 0, 100];
-            }
-            if (diffMinutes < 15) {
-              color = [255, 0, 0, 100];
-            }
-          }
-        }
-      }
-      if (setBadge) {
-        console.info(`Setting badge for ${tabId} with ${count}${abbr}`);
-        chrome.action.setBadgeText({ tabId: tabId, text: `${count}${abbr}` });
-        chrome.action.setBadgeBackgroundColor({ tabId: tabId, color: color });
-      } else {
-        console.info(`Setting badge for ${tabId} with empty`);
-        try {
-          chrome.action.setBadgeText({ tabId: tabId, text: "" });
-        } catch {
-          console.error(`Can't set the badge for tab $tabId`);
-        }
-      }
-      chrome.action.setTitle({
-        tabId: tabId,
-        title: `Best before: ${diff.months} months, ${diff.days} days, ${
-          diff.hours
-        } hours, ${Math.floor(diff.minutes)} minutes`,
-      });
-    }
-  };
 
-  chrome.tabs.onUpdated.addListener((tabId) => {
-    setBadgeAndTitle(tabId);
-    console.debug(`Requesting update for ${tabId}`);
-    chrome.tabs.get(tabId, (tab) => {
-      const tabId = tab.id;
-      const tabTitle = tab.title;
-      const tabURL = tab.url;
-      if (!expiringTabInformation[tabId]) {
-        return;
-      }
-      expiringTabInformation[tabId][kTitleKey] = tabTitle;
-      expiringTabInformation[tabId][kURLKey] = tabURL;
-      Promise.all([
-        chrome.storage.local.set({
-          [kStorageKey]: expiringTabInformation,
-        }),
-      ])
-        .then(() => {
-          console.info("Updated URL and title for tab");
-          console.debug(expiringTabInformation);
-        })
-        .catch((error) => {
-          console.error("Error saving data:", error);
-        });
+    const expirationDateTime = DateTime.fromISO(expirationDate);
+    const now = DateTime.now();
+    const diffMinutes = expirationDateTime.diff(now, "minutes").minutes;
+
+    let text = "";
+    let color = [0, 0, 0, 0]; // Default clear
+
+    if (diffMinutes < 0) {
+      text = "...";
+    } else if (diffMinutes < 60) {
+      text = `${Math.floor(diffMinutes)}m`;
+      color = [255, 0, 0, 100]; // Red
+    } else if (diffMinutes < 180) {
+      text = `${Math.ceil(diffMinutes / 60)}h`;
+      color = [200, 200, 0, 100]; // Amber
+    } else if (diffMinutes < 24 * 60) {
+      text = `${Math.ceil(diffMinutes / 60)}h`;
+    } else {
+      text = `${Math.ceil(diffMinutes / (60 * 24))}d`;
+    }
+
+    chrome.action.setBadgeText({ tabId: tabId, text });
+    chrome.action.setBadgeBackgroundColor({ tabId: tabId, color });
+
+    const remaining = expirationDateTime.diff(now, [
+      "months",
+      "days",
+      "hours",
+      "minutes",
+    ]);
+    chrome.action.setTitle({
+      tabId: tabId,
+      title: `Expires in: ${remaining.toFormat("M 'months,' d 'days,' h 'hours,' m 'minutes'")}`,
     });
-  });
-
-  chrome.tabs.onRemoved.addListener((tabId) => {
-    removeTab(tabId);
-  });
-
-  chrome.tabs.onActivated.addListener((tab) => {
-    setBadgeAndTitle(tab.tabId);
-  });
-
-  const removeTab = (tabId) => {
-    console.info(`Requested deletion for ${tabId}`);
-    delete expiringTabInformation[tabId];
-    Promise.all([
-      chrome.storage.local.set({
-        [kStorageKey]: expiringTabInformation,
-      }),
-    ])
-      .then(() => {
-        console.info("Deleted tab from list");
-        console.debug(expiringTabInformation);
-      })
-      .catch((error) => {
-        console.error("Error saving data:", error);
-      });
-  };
-
-  const incrementTab = (tabId) => {
-    console.info(`Requested increment for ${tabId}`);
-    expiringTabInformation[tabId].count += 1;
-    /*Promise.all([
-      chrome.storage.local.set({
-        [kStorageKey]: expiringTabInformation,
-      }),
-    ])
-      .then(() => {
-        console.info("Incremented tab count from list");
-        console.debug(expiringTabInformation);
-      })
-      .catch((error) => {
-        console.error("Error saving data:", error);
-      });*/
-  };
-
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log("received request");
-    console.log(request);
-    if (request.setExpiration) {
-      setExpirationDateTime(
-        request.setExpiration.tabId,
-        request.setExpiration.tabTitle,
-        request.setExpiration.tabURL,
-        request.setExpiration.chosenDateTime,
-      );
-    }
-    if (request.deleteTab) {
-      removeTab(request.deleteTab.tabId);
-    }
-    if (request.incrementTab) {
-      incrementTab(request.incrementTab.tabId);
-    }
-  });
+  }
 });
-
-function isValidDateTime(dateTimeString) {
-  // I know I should validate, but didn't bother so far.
-  return true;
-}

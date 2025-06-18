@@ -4,14 +4,15 @@
 > automatically closed**.
 
 <!-- vscode-markdown-toc -->
-* [What is this?](#Whatisthis)
-* [Caveats](#Caveats)
-	* [How it looks like in Chrome (a bit outdated, it looks better now, but I didn't bother creating new screenshots yet)](#HowitlookslikeinChromeabitoutdateditlooksbetternowbutIdidntbothercreatingnewscreenshotsyet)
-* [Why?](#Why)
-* [Bugs, etc.?](#Bugsetc.)
-* [Installing](#Installing)
-* [What about Safari?](#WhataboutSafari)
-* [Attribution](#Attribution)
+
+- [What is this?](#Whatisthis)
+- [Caveats](#Caveats)
+  - [How it looks like in Chrome (a bit outdated, it looks better now, but I didn't bother creating new screenshots yet)](#HowitlookslikeinChromeabitoutdateditlooksbetternowbutIdidntbothercreatingnewscreenshotsyet)
+- [Why?](#Why)
+- [Bugs, etc.?](#Bugsetc.)
+- [Installing](#Installing)
+- [What about Safari?](#WhataboutSafari)
+- [Attribution](#Attribution)
 
 <!-- vscode-markdown-toc-config
 	numbering=false
