@@ -22,6 +22,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
   function setupAlarms() {
     chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
     chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
+    chrome.alarms.create("cleanupExpiredTabs", { periodInMinutes: 60 });
   }
 
   function setupTabEventListeners() {
@@ -42,6 +43,10 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
           request.setExpiration.tabURL,
           request.setExpiration.chosenDateTime,
         );
+        // Update expiringTabInformation from storage after modification
+        chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
+          expiringTabInformation = result[kStorageKey];
+        });
       }
       if (request.deleteTab) {
         removeTab(request.deleteTab.tabId);
@@ -117,13 +122,36 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
           chrome.tabs.remove(Number(tabId)).catch(() => {});
         }
       });
+    } else if (alarm.name === "cleanupExpiredTabs") {
+      const oneDayAgo = DateTime.now().minus({ days: 1 });
+      let changed = false;
+      Object.keys(expiringTabInformation).forEach((tabId) => {
+        const tabInfo = expiringTabInformation[tabId];
+        if (
+          tabInfo &&
+          tabInfo[kExpirationKey] &&
+          tabInfo[kExpirationKey] !== kForeverTab
+        ) {
+          const expirationTime = DateTime.fromISO(tabInfo[kExpirationKey]);
+          if (expirationTime < oneDayAgo) {
+            delete expiringTabInformation[tabId];
+            changed = true;
+          }
+        }
+      });
+
+      if (changed) {
+        chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+      }
     }
   });
 
   async function handleTabCreated(tab) {
     if (!tab.id || expiringTabInformation[tab.id]) return;
-
-    // Check if it's an app window
+    if (tab.pinned) {
+      setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+      return;
+    }
     if (tab.windowId) {
       try {
         const win = await chrome.windows.get(tab.windowId);
@@ -135,8 +163,6 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
         /* window might be gone */
       }
     }
-
-    // Set default expiry
     const { [kStorageDefaultHours]: defaultExpiry = 12 } =
       await chrome.storage.sync.get(kStorageDefaultHours);
     const expirationDateTime = DateTime.now()
@@ -145,12 +171,38 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
   }
 
-  function handleTabUpdated(tabId, changeInfo, tab) {
+  async function handleTabUpdated(tabId, changeInfo, tab) {
+    if (!tab) return;
+    if (tab.pinned) {
+      setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+      return;
+    }
+    const wasForever =
+      expiringTabInformation[tabId] &&
+      expiringTabInformation[tabId][kExpirationKey] === kForeverTab;
+    if (wasForever) {
+      const { [kStorageDefaultHours]: defaultExpiry = 12 } =
+        await chrome.storage.sync.get(kStorageDefaultHours);
+      const expirationDateTime = DateTime.now()
+        .plus({ hours: defaultExpiry })
+        .toString();
+      setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
+      return;
+    }
     if (changeInfo.status === "complete" && tab.url) {
       if (expiringTabInformation[tabId]) {
         expiringTabInformation[tabId][kTitleKey] = tab.title;
         expiringTabInformation[tabId][kURLKey] = tab.url;
-        chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+        await chrome.storage.local.set({
+          [kStorageKey]: expiringTabInformation,
+        });
+      } else {
+        const { [kStorageDefaultHours]: defaultExpiry = 12 } =
+          await chrome.storage.sync.get(kStorageDefaultHours);
+        const expirationDateTime = DateTime.now()
+          .plus({ hours: defaultExpiry })
+          .toString();
+        setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
       }
     }
     setBadgeAndTitle(tabId);
@@ -175,29 +227,23 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
 
   function setBadgeAndTitle(tabId) {
     if (!tabId) return;
-
     const tabInfo = expiringTabInformation[tabId];
     if (!tabInfo) {
       chrome.action.setBadgeText({ tabId, text: "" });
       return;
     }
-
     const expirationDate = tabInfo[kExpirationKey];
-
     if (expirationDate === kForeverTab) {
       chrome.action.setBadgeBackgroundColor({ color: [0, 125, 0, 100] });
       chrome.action.setTitle({ tabId: tabId, title: `This tab never expires` });
       chrome.action.setBadgeText({ tabId: tabId, text: `∞` });
       return;
     }
-
     const expirationDateTime = DateTime.fromISO(expirationDate);
     const now = DateTime.now();
     const diffMinutes = expirationDateTime.diff(now, "minutes").minutes;
-
     let text = "";
-    let color = [0, 0, 0, 0]; // Default clear
-
+    let color = [0, 0, 0, 0];
     if (diffMinutes < 0) {
       text = "...";
     } else if (diffMinutes < 60) {
@@ -211,10 +257,8 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     } else {
       text = `${Math.ceil(diffMinutes / (60 * 24))}d`;
     }
-
     chrome.action.setBadgeText({ tabId: tabId, text });
     chrome.action.setBadgeBackgroundColor({ tabId: tabId, color });
-
     const remaining = expirationDateTime.diff(now, [
       "months",
       "days",
@@ -223,7 +267,9 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     ]);
     chrome.action.setTitle({
       tabId: tabId,
-      title: `Expires in: ${remaining.toFormat("M 'months,' d 'days,' h 'hours,' m 'minutes'")}`,
+      title: `Expires in: ${remaining.toFormat(
+        "M 'months,' d 'days,' h 'hours,' m 'minutes'",
+      )}`,
     });
   }
 });

@@ -6,7 +6,7 @@ import {
   kTitleKey,
   kStorageKey,
   kForeverTab,
-  refreshWithOldInfo,
+  stillExists,
 } from "./common.js";
 
 function getColorString(value) {
@@ -95,7 +95,7 @@ chrome.tabs.query({}, (existingTabs) => {
         console.info(`Switching to tab ${tabId}`);
         chrome.tabs.update(+tabId, { active: true });
       }
-      if (refreshWithOldInfo(tabId, existingTabs, expiringTabInformation)) {
+      if (!stillExists(tabId, existingTabs)) {
         row.classList.add("nonexistent");
       }
       const deleteButtonId = `delete-${tabId}`;
@@ -132,3 +132,15 @@ chrome.tabs.query({}, (existingTabs) => {
     });
   });
 });
+
+const toggleButton = document.getElementById("toggle-visibility");
+if (toggleButton) {
+  let areNonexistentVisible = false;
+  toggleButton.addEventListener("click", () => {
+    areNonexistentVisible = !areNonexistentVisible;
+    const nonexistentRows = document.querySelectorAll(".nonexistent");
+    nonexistentRows.forEach((row) => {
+      row.style.display = areNonexistentVisible ? "table-row" : "none";
+    });
+  });
+}
