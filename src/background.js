@@ -23,6 +23,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
     chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
     chrome.alarms.create("cleanupExpiredTabs", { periodInMinutes: 60 });
+    chrome.alarms.create("reconcileTabsPeriodically", { periodInMinutes: 1 });
   }
 
   function setupTabEventListeners() {
@@ -91,6 +92,55 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     console.log("Reconciliation complete.", expiringTabInformation);
   }
 
+  async function reconcileTabsPeriodically() {
+    console.info("Starting tab reconciliation");
+    const allCurrentTabs = await chrome.tabs.query({});
+    const currentTabIds = new Set(allCurrentTabs.map((t) => `${t.id}`));
+
+    const trackedIds = new Set(Object.keys(expiringTabInformation));
+
+    const nonExistentTrackedIds = [...trackedIds].filter(
+      (id) => !currentTabIds.has(id),
+    );
+    const untrackedTabs = allCurrentTabs.filter(
+      (tab) => !trackedIds.has(`${tab.id}`),
+    );
+
+    if (nonExistentTrackedIds.length === 0 || untrackedTabs.length === 0) {
+      return; // Nothing to match
+    }
+
+    const unmappedTrackedInfo = {};
+    for (const id of nonExistentTrackedIds) {
+      unmappedTrackedInfo[id] = expiringTabInformation[id];
+    }
+
+    let changed = false;
+    const reconciledOldIds = new Set();
+
+    for (const untrackedTab of untrackedTabs) {
+      const oldTabId = findBestMatchInOldInfo(
+        untrackedTab.url,
+        unmappedTrackedInfo,
+        reconciledOldIds,
+      );
+      if (oldTabId) {
+        console.log(
+          `Periodic reconcile: moving expiry from ${oldTabId} to ${untrackedTab.id} for ${untrackedTab.url}`,
+        );
+        expiringTabInformation[untrackedTab.id] =
+          expiringTabInformation[oldTabId];
+        delete expiringTabInformation[oldTabId];
+        reconciledOldIds.add(oldTabId);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+    }
+  }
+
   function findBestMatchInOldInfo(url, oldTabInfo, reconciledOldIds) {
     if (!url) return null;
     for (const oldId in oldTabInfo) {
@@ -143,6 +193,8 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
       if (changed) {
         chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
       }
+    } else if (alarm.name === "reconcileTabsPeriodically") {
+      reconcileTabsPeriodically();
     }
   });
 
@@ -177,33 +229,25 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
       setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
       return;
     }
-    const wasForever =
-      expiringTabInformation[tabId] &&
-      expiringTabInformation[tabId][kExpirationKey] === kForeverTab;
-    if (wasForever) {
-      const { [kStorageDefaultHours]: defaultExpiry = 12 } =
-        await chrome.storage.sync.get(kStorageDefaultHours);
-      const expirationDateTime = DateTime.now()
-        .plus({ hours: defaultExpiry })
-        .toString();
-      setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
-      return;
-    }
+
+    // The original logic to reset 'forever' tabs when un-pinned was too aggressive
+    // and caused issues with non-pinned tabs that were manually set to forever.
+    // It has been removed. Now, an un-pinned tab will remain 'forever' until
+    // manually changed by the user, which is more predictable behavior.
+
     if (changeInfo.status === "complete" && tab.url) {
       if (expiringTabInformation[tabId]) {
+        // If we are tracking the tab, update its title and URL.
+        // The expiration date is preserved. This fixes the issue with sleeping tabs.
         expiringTabInformation[tabId][kTitleKey] = tab.title;
         expiringTabInformation[tabId][kURLKey] = tab.url;
         await chrome.storage.local.set({
           [kStorageKey]: expiringTabInformation,
         });
-      } else {
-        const { [kStorageDefaultHours]: defaultExpiry = 12 } =
-          await chrome.storage.sync.get(kStorageDefaultHours);
-        const expirationDateTime = DateTime.now()
-          .plus({ hours: defaultExpiry })
-          .toString();
-        setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
       }
+      // The 'else' block that assigned a default expiration has been removed.
+      // This was the cause of the issue with sleeping tabs getting their expiry reset.
+      // Default expirations are now only handled in handleTabCreated.
     }
     setBadgeAndTitle(tabId);
   }
