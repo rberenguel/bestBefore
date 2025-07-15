@@ -69,22 +69,29 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
       });
     } else if (alarm.name === "checkExpiration") {
       const currentTime = DateTime.now();
-      const allTabs = await chrome.tabs.query({});
-      Object.keys(expiringTabInformation).forEach((key) => {
+      let changed = false;
+      for (const key in expiringTabInformation) {
         const tabInformation = expiringTabInformation[key];
         if (tabInformation[kExpirationKey] === kForeverTab) {
-          return;
+          continue;
         }
         const expirationTime = DateTime.fromISO(tabInformation[kExpirationKey]);
         if (currentTime >= expirationTime) {
-          const tab = allTabs.find(
-            (t) => t.url === tabInformation[kURLKey],
-          );
-          if (tab) {
+          const tabsToClose = await chrome.tabs.query({
+            url: tabInformation[kURLKey],
+          });
+          for (const tab of tabsToClose) {
             chrome.tabs.remove(tab.id).catch(() => {});
           }
+          delete expiringTabInformation[key];
+          changed = true;
         }
-      });
+      }
+      if (changed) {
+        await chrome.storage.local.set({
+          [kStorageKey]: expiringTabInformation,
+        });
+      }
     } else if (alarm.name === "cleanupExpiredTabs") {
       const oneDayAgo = DateTime.now().minus({ days: 1 });
       let changed = false;
@@ -109,7 +116,12 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     }
   });
 
+  function isNewTab(url) {
+    return !url || url === "about:blank" || url.startsWith("chrome://newtab");
+  }
+
   async function handleTabCreated(tab) {
+    if (isNewTab(tab.url)) return;
     const key = urlToKey(tab.url);
     if (!key) return;
     if (tab.pinned) {
@@ -136,7 +148,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
   }
 
   async function handleTabUpdated(tabId, changeInfo, tab) {
-    if (!tab) return;
+    if (!tab || isNewTab(tab.url)) return;
     const key = urlToKey(tab.url);
     if (!key) return;
     if (tab.pinned) {
@@ -168,6 +180,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
   }
 
   function setExpirationDateTime(tabTitle, tabURL, expirationDateTime) {
+    if (isNewTab(tabURL)) return;
     const key = urlToKey(tabURL);
     if (!key) return;
     expiringTabInformation[key] = {
@@ -201,6 +214,10 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
   async function setBadgeAndTitle(tabId) {
     if (!tabId) return;
     const tab = await chrome.tabs.get(tabId);
+    if (isNewTab(tab.url)) {
+      chrome.action.setBadgeText({ tabId, text: "" });
+      return;
+    }
     const key = urlToKey(tab.url);
     if (!key) return;
     const tabInfo = expiringTabInformation[key];
