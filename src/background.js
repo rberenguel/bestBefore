@@ -6,6 +6,7 @@ import {
   kURLKey,
   kStorageDefaultHours,
   kForeverTab,
+  urlToKey,
 } from "./common.js";
 
 // --- Main Initialization ---
@@ -23,13 +24,12 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     chrome.alarms.create("checkExpiration", { periodInMinutes: 1 });
     chrome.alarms.create("updateBadge", { periodInMinutes: 0.5 });
     chrome.alarms.create("cleanupExpiredTabs", { periodInMinutes: 60 });
-    chrome.alarms.create("reconcileTabsPeriodically", { periodInMinutes: 1 });
   }
 
   function setupTabEventListeners() {
     chrome.tabs.onCreated.addListener(handleTabCreated);
     chrome.tabs.onUpdated.addListener(handleTabUpdated);
-    chrome.tabs.onRemoved.addListener(removeTab);
+    chrome.tabs.onRemoved.addListener(handleTabRemoved);
     chrome.tabs.onActivated.addListener((activeInfo) =>
       setBadgeAndTitle(activeInfo.tabId),
     );
@@ -39,7 +39,6 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.setExpiration) {
         setExpirationDateTime(
-          request.setExpiration.tabId,
           request.setExpiration.tabTitle,
           request.setExpiration.tabURL,
           request.setExpiration.chosenDateTime,
@@ -50,110 +49,18 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
         });
       }
       if (request.deleteTab) {
-        removeTab(request.deleteTab.tabId);
+        if (request.deleteTab.tabURL) {
+          removeTab(request.deleteTab.tabURL);
+        } else if (request.deleteTab.tabId) {
+          removeTabById(request.deleteTab.tabId);
+        }
       }
     });
   }
 
-  // --- Reconciliation Logic on Startup ---
-
-  chrome.runtime.onStartup.addListener(() => {
-    console.log("Browser startup detected. Reconciling tabs.");
-    reconcileTabsOnStartup();
-  });
-
-  async function reconcileTabsOnStartup() {
-    const { [kStorageKey]: oldTabInfo } =
-      await chrome.storage.local.get(kStorageKey);
-    if (!oldTabInfo || Object.keys(oldTabInfo).length === 0) {
-      return; // Nothing to reconcile
-    }
-
-    const currentTabs = await chrome.tabs.query({});
-    const newTabInfo = {};
-    const reconciledOldIds = new Set();
-
-    // Find a new home for old expiry data
-    for (const currentTab of currentTabs) {
-      const oldTabId = findBestMatchInOldInfo(
-        currentTab.url,
-        oldTabInfo,
-        reconciledOldIds,
-      );
-      if (oldTabId) {
-        newTabInfo[currentTab.id] = oldTabInfo[oldTabId];
-        reconciledOldIds.add(oldTabId);
-      }
-    }
-
-    // Replace the old data with the newly reconciled data
-    expiringTabInformation = newTabInfo;
-    await chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
-    console.log("Reconciliation complete.", expiringTabInformation);
-  }
-
-  async function reconcileTabsPeriodically() {
-    console.info("Starting tab reconciliation");
-    const allCurrentTabs = await chrome.tabs.query({});
-    const currentTabIds = new Set(allCurrentTabs.map((t) => `${t.id}`));
-
-    const trackedIds = new Set(Object.keys(expiringTabInformation));
-
-    const nonExistentTrackedIds = [...trackedIds].filter(
-      (id) => !currentTabIds.has(id),
-    );
-    const untrackedTabs = allCurrentTabs.filter(
-      (tab) => !trackedIds.has(`${tab.id}`),
-    );
-
-    if (nonExistentTrackedIds.length === 0 || untrackedTabs.length === 0) {
-      return; // Nothing to match
-    }
-
-    const unmappedTrackedInfo = {};
-    for (const id of nonExistentTrackedIds) {
-      unmappedTrackedInfo[id] = expiringTabInformation[id];
-    }
-
-    let changed = false;
-    const reconciledOldIds = new Set();
-
-    for (const untrackedTab of untrackedTabs) {
-      const oldTabId = findBestMatchInOldInfo(
-        untrackedTab.url,
-        unmappedTrackedInfo,
-        reconciledOldIds,
-      );
-      if (oldTabId) {
-        console.log(
-          `Periodic reconcile: moving expiry from ${oldTabId} to ${untrackedTab.id} for ${untrackedTab.url}`,
-        );
-        expiringTabInformation[untrackedTab.id] =
-          expiringTabInformation[oldTabId];
-        delete expiringTabInformation[oldTabId];
-        reconciledOldIds.add(oldTabId);
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      await chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
-    }
-  }
-
-  function findBestMatchInOldInfo(url, oldTabInfo, reconciledOldIds) {
-    if (!url) return null;
-    for (const oldId in oldTabInfo) {
-      if (!reconciledOldIds.has(oldId) && oldTabInfo[oldId][kURLKey] === url) {
-        return oldId;
-      }
-    }
-    return null;
-  }
-
   // --- Event Handlers & Core Logic ---
 
-  chrome.alarms.onAlarm.addListener((alarm) => {
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === "updateBadge") {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs && tabs[0] && tabs[0].id) {
@@ -162,21 +69,27 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
       });
     } else if (alarm.name === "checkExpiration") {
       const currentTime = DateTime.now();
-      Object.keys(expiringTabInformation).forEach((tabId) => {
-        const tabInformation = expiringTabInformation[tabId];
+      const allTabs = await chrome.tabs.query({});
+      Object.keys(expiringTabInformation).forEach((key) => {
+        const tabInformation = expiringTabInformation[key];
         if (tabInformation[kExpirationKey] === kForeverTab) {
           return;
         }
         const expirationTime = DateTime.fromISO(tabInformation[kExpirationKey]);
         if (currentTime >= expirationTime) {
-          chrome.tabs.remove(Number(tabId)).catch(() => {});
+          const tab = allTabs.find(
+            (t) => t.url === tabInformation[kURLKey],
+          );
+          if (tab) {
+            chrome.tabs.remove(tab.id).catch(() => {});
+          }
         }
       });
     } else if (alarm.name === "cleanupExpiredTabs") {
       const oneDayAgo = DateTime.now().minus({ days: 1 });
       let changed = false;
-      Object.keys(expiringTabInformation).forEach((tabId) => {
-        const tabInfo = expiringTabInformation[tabId];
+      Object.keys(expiringTabInformation).forEach((key) => {
+        const tabInfo = expiringTabInformation[key];
         if (
           tabInfo &&
           tabInfo[kExpirationKey] &&
@@ -184,7 +97,7 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
         ) {
           const expirationTime = DateTime.fromISO(tabInfo[kExpirationKey]);
           if (expirationTime < oneDayAgo) {
-            delete expiringTabInformation[tabId];
+            delete expiringTabInformation[key];
             changed = true;
           }
         }
@@ -193,22 +106,21 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
       if (changed) {
         chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
       }
-    } else if (alarm.name === "reconcileTabsPeriodically") {
-      reconcileTabsPeriodically();
     }
   });
 
   async function handleTabCreated(tab) {
-    if (!tab.id || expiringTabInformation[tab.id]) return;
+    const key = urlToKey(tab.url);
+    if (!key) return;
     if (tab.pinned) {
-      setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+      setExpirationDateTime(tab.title, tab.url, kForeverTab);
       return;
     }
     if (tab.windowId) {
       try {
         const win = await chrome.windows.get(tab.windowId);
         if (win.type === "app") {
-          setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+          setExpirationDateTime(tab.title, tab.url, kForeverTab);
           return;
         }
       } catch (e) {
@@ -220,58 +132,78 @@ chrome.storage.local.get({ [kStorageKey]: {} }, (result) => {
     const expirationDateTime = DateTime.now()
       .plus({ hours: defaultExpiry })
       .toString();
-    setExpirationDateTime(tab.id, tab.title, tab.url, expirationDateTime);
+    setExpirationDateTime(tab.title, tab.url, expirationDateTime);
   }
 
   async function handleTabUpdated(tabId, changeInfo, tab) {
     if (!tab) return;
+    const key = urlToKey(tab.url);
+    if (!key) return;
     if (tab.pinned) {
-      setExpirationDateTime(tab.id, tab.title, tab.url, kForeverTab);
+      setExpirationDateTime(tab.title, tab.url, kForeverTab);
       return;
     }
 
-    // The original logic to reset 'forever' tabs when un-pinned was too aggressive
-    // and caused issues with non-pinned tabs that were manually set to forever.
-    // It has been removed. Now, an un-pinned tab will remain 'forever' until
-    // manually changed by the user, which is more predictable behavior.
-
     if (changeInfo.status === "complete" && tab.url) {
-      if (expiringTabInformation[tabId]) {
-        // If we are tracking the tab, update its title and URL.
-        // The expiration date is preserved. This fixes the issue with sleeping tabs.
-        expiringTabInformation[tabId][kTitleKey] = tab.title;
-        expiringTabInformation[tabId][kURLKey] = tab.url;
+      if (expiringTabInformation[key]) {
+        expiringTabInformation[key][kTitleKey] = tab.title;
+        expiringTabInformation[key][kURLKey] = tab.url;
         await chrome.storage.local.set({
           [kStorageKey]: expiringTabInformation,
         });
+      } else {
+        const { [kStorageDefaultHours]: defaultExpiry = 12 } =
+          await chrome.storage.sync.get(kStorageDefaultHours);
+        const expirationDateTime = DateTime.now()
+          .plus({ hours: defaultExpiry })
+          .toString();
+        setExpirationDateTime(tab.title, tab.url, expirationDateTime);
       }
-      // The 'else' block that assigned a default expiration has been removed.
-      // This was the cause of the issue with sleeping tabs getting their expiry reset.
-      // Default expirations are now only handled in handleTabCreated.
     }
     setBadgeAndTitle(tabId);
   }
 
-  function setExpirationDateTime(tabId, tabTitle, tabURL, expirationDateTime) {
-    if (!tabId) return;
-    expiringTabInformation[tabId] = {
+  function handleTabRemoved(tabId, removeInfo) {
+    // We don't need to do anything here anymore, as we are not tracking by tabId
+  }
+
+  function setExpirationDateTime(tabTitle, tabURL, expirationDateTime) {
+    const key = urlToKey(tabURL);
+    if (!key) return;
+    expiringTabInformation[key] = {
       [kExpirationKey]: expirationDateTime,
       [kTitleKey]: tabTitle,
       [kURLKey]: tabURL,
     };
     chrome.storage.local
       .set({ [kStorageKey]: expiringTabInformation })
-      .then(() => setBadgeAndTitle(tabId));
+      .then(async () => {
+        const tabs = await chrome.tabs.query({ url: tabURL });
+        if (tabs && tabs[0]) {
+          setBadgeAndTitle(tabs[0].id);
+        }
+      });
   }
 
-  function removeTab(tabId) {
+  function removeTab(tabURL) {
+    const key = urlToKey(tabURL);
+    if (!key) return;
+    delete expiringTabInformation[key];
+    chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
+  }
+
+  function removeTabById(tabId) {
+    if (!tabId) return;
     delete expiringTabInformation[tabId];
     chrome.storage.local.set({ [kStorageKey]: expiringTabInformation });
   }
 
-  function setBadgeAndTitle(tabId) {
+  async function setBadgeAndTitle(tabId) {
     if (!tabId) return;
-    const tabInfo = expiringTabInformation[tabId];
+    const tab = await chrome.tabs.get(tabId);
+    const key = urlToKey(tab.url);
+    if (!key) return;
+    const tabInfo = expiringTabInformation[key];
     if (!tabInfo) {
       chrome.action.setBadgeText({ tabId, text: "" });
       return;

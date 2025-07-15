@@ -1,6 +1,11 @@
 import { DateTime } from "../lib/luxon.js";
 
-import { kExpirationKey, kForeverTab, kStorageKey } from "./common.js";
+import {
+  kExpirationKey,
+  kForeverTab,
+  kStorageKey,
+  urlToKey,
+} from "./common.js";
 
 const noExpiryButton = document.getElementById("no-expiry");
 const seeTabInfoButton = document.getElementById("tab-info");
@@ -12,9 +17,10 @@ const sevenDaysButton = document.getElementById("seven-days");
 const oneMonthButton = document.getElementById("one-month");
 
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-  const tabId = tabs[0].id;
-  const tabTitle = tabs[0].title;
-  const tabURL = tabs[0].url;
+  const tab = tabs[0];
+  const tabTitle = tab.title;
+  const tabURL = tab.url;
+  const key = urlToKey(tabURL);
 
   const expirationPicker = document.getElementById("expiration-picker");
 
@@ -22,10 +28,10 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expiringTabInformation = storedData[kStorageKey];
     let expirationTime = undefined;
     if (
-      tabId in expiringTabInformation &&
-      kExpirationKey in expiringTabInformation[tabId]
+      key in expiringTabInformation &&
+      kExpirationKey in expiringTabInformation[key]
     ) {
-      expirationTime = expiringTabInformation[tabId][kExpirationKey];
+      expirationTime = expiringTabInformation[key][kExpirationKey];
     }
     if (expirationTime && expirationTime != kForeverTab) {
       // Don't judge me
@@ -39,14 +45,14 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const chosenDateTime = expirationPicker.value;
     if (chosenDateTime) {
       chrome.runtime.sendMessage({
-        setExpiration: { tabId, tabTitle, tabURL, chosenDateTime },
+        setExpiration: { tabTitle, tabURL, chosenDateTime },
       });
     }
   });
 
   noExpiryButton.addEventListener("click", () => {
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: kForeverTab },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: kForeverTab },
     });
   });
 
@@ -58,7 +64,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expirationDateTime = DateTime.now();
     const formatted = expirationDateTime.plus({ hours: 1 }).toString();
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: formatted },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: formatted },
     });
     window.close();
   });
@@ -67,7 +73,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expirationDateTime = DateTime.now();
     const formatted = expirationDateTime.plus({ hours: 3 }).toString();
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: formatted },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: formatted },
     });
     window.close();
   });
@@ -76,7 +82,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expirationDateTime = DateTime.now();
     const formatted = expirationDateTime.plus({ days: 1 }).toString();
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: formatted },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: formatted },
     });
     window.close();
   });
@@ -87,7 +93,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expirationDateTime = DateTime.now();
     const formatted = expirationDateTime.plus({ days: 3 }).toString();
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: formatted },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: formatted },
     });
     window.close();
   });
@@ -96,7 +102,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expirationDateTime = DateTime.now();
     const formatted = expirationDateTime.plus({ days: 7 }).toString();
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: formatted },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: formatted },
     });
     window.close();
   });
@@ -105,8 +111,12 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const expirationDateTime = DateTime.now();
     const formatted = expirationDateTime.plus({ days: 31 }).toString();
     chrome.runtime.sendMessage({
-      setExpiration: { tabId, tabTitle, tabURL, chosenDateTime: formatted },
+      setExpiration: { tabTitle, tabURL, chosenDateTime: formatted },
     });
     window.close();
   });
 });
+
+const manifest = chrome.runtime.getManifest();
+const version = manifest.version;
+document.getElementById("version").textContent = version;

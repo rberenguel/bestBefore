@@ -6,7 +6,7 @@ import {
   kTitleKey,
   kStorageKey,
   kForeverTab,
-  stillExists,
+  urlToKey,
 } from "./common.js";
 
 function getColorString(value) {
@@ -34,17 +34,35 @@ function getColorString(value) {
   return `rgba(${r}, ${g}, ${b}, 1.0)`;
 }
 chrome.tabs.query({}, (existingTabs) => {
+  const urlToTabIdMap = new Map();
+  existingTabs.forEach((tab) => {
+    if (tab.url) {
+      urlToTabIdMap.set(tab.url, { id: tab.id, windowId: tab.windowId });
+    }
+  });
+
+  async function switchToTab(tabURL) {
+    console.info(`Switching to tab ${tabURL}`);
+    const tabInfo = urlToTabIdMap.get(tabURL);
+    if (tabInfo) {
+      await chrome.windows.update(tabInfo.windowId, { focused: true });
+      await chrome.tabs.update(tabInfo.id, { active: true });
+    } else {
+      console.warn(`No active tab found for URL: ${tabURL}`);
+    }
+  }
+
   chrome.storage.local.get({ [kStorageKey]: {} }, (storedData) => {
     const expiringTabInformation = storedData[kStorageKey];
     // TODO(me) Copied this verbatim from background.js, can I get the common parts out?
-    const getRemainingCell = (tabId) => {
+    const getRemainingCell = (key) => {
       const currentTime = DateTime.now();
       let expirationDate = undefined;
       if (
-        tabId in expiringTabInformation &&
-        kExpirationKey in expiringTabInformation[tabId]
+        key in expiringTabInformation &&
+        kExpirationKey in expiringTabInformation[key]
       ) {
-        expirationDate = expiringTabInformation[tabId][kExpirationKey];
+        expirationDate = expiringTabInformation[key][kExpirationKey];
       }
       if (expirationDate == kForeverTab) {
         return "<td class='remaining'></td>";
@@ -72,8 +90,8 @@ chrome.tabs.query({}, (existingTabs) => {
         )} m</span></td>`;
       }
     };
-    Object.keys(expiringTabInformation).forEach((tabId) => {
-      const tabInformation = expiringTabInformation[tabId];
+    Object.keys(expiringTabInformation).forEach((key) => {
+      const tabInformation = expiringTabInformation[key];
       const row = document.createElement("tr");
       let fullTitle = tabInformation[kTitleKey];
       let title = fullTitle;
@@ -84,22 +102,29 @@ chrome.tabs.query({}, (existingTabs) => {
       if (tabInformation[kURLKey] === undefined) {
         link = `${tabInformation[kTitleKey]}`;
       }
-      const rowFor = (tabId) => `tab-${tabId}`;
-      function deleteTab(tabId) {
-        console.info(`Meaning to delete ${tabId}`);
-        delete expiringTabInformation[tabId];
-        chrome.runtime.sendMessage({ deleteTab: { tabId } });
-        document.getElementById(rowFor(tabId)).remove();
+      const rowFor = (key) => `tab-${key}`;
+      function deleteTab(key) {
+        console.info(`Meaning to delete ${key}`);
+        delete expiringTabInformation[key];
+        const isNumericKey = !isNaN(key);
+        if (isNumericKey) {
+          chrome.runtime.sendMessage({ deleteTab: { tabId: key } });
+        } else {
+          chrome.runtime.sendMessage({
+            deleteTab: { tabURL: tabInformation[kURLKey] },
+          });
+        }
+        document.getElementById(rowFor(key)).remove();
       }
-      function switchToTab(tabId) {
-        console.info(`Switching to tab ${tabId}`);
-        chrome.tabs.update(+tabId, { active: true });
-      }
-      if (!stillExists(tabId, existingTabs)) {
+
+      const tabExists = existingTabs.some(
+        (t) => t.url === tabInformation[kURLKey],
+      );
+      if (!tabExists) {
         row.classList.add("nonexistent");
       }
-      const deleteButtonId = `delete-${tabId}`;
-      const switchButtonId = `switch-${tabId}`;
+      const deleteButtonId = `delete-${key}`;
+      const switchButtonId = `switch-${key}`;
       let formatted = "Does not expire";
       if (tabInformation[kExpirationKey] !== kForeverTab) {
         formatted = DateTime.fromISO(
@@ -108,23 +133,25 @@ chrome.tabs.query({}, (existingTabs) => {
       }
 
       row.innerHTML = `
-      <td><button title='Switch to this tab' id='${switchButtonId}'>${tabId}</button></td>
+      <td><button title='Switch to this tab' id='${switchButtonId}'>Switch</button></td>
       <td class='link'>${link}</a></td>
       <td class='expiry'>${formatted}</td>
-      ${getRemainingCell(tabId)}
+      ${getRemainingCell(key)}
       <td>
         <button id='${deleteButtonId}' class='delete'>&#10060;</button>
       </td>
     `;
-      row.id = rowFor(tabId);
+      row.id = rowFor(key);
       const tableBody = document.getElementById("tabInfoTable");
       tableBody.appendChild(row);
       document.getElementById(deleteButtonId).addEventListener("click", () => {
-        deleteTab(tabId);
+        deleteTab(key);
       });
-      document.getElementById(switchButtonId).addEventListener("click", () => {
-        switchToTab(tabId);
-      });
+      document
+        .getElementById(switchButtonId)
+        .addEventListener("click", () => {
+          switchToTab(tabInformation[kURLKey]);
+        });
       const tabInfoTableContainer = document.getElementById(
         "tabInfoTableContainer",
       );

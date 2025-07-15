@@ -7,7 +7,7 @@ export {
   kURLKey,
   kStorageDefaultHours,
   stillExists,
-  findMatchingTabIdForURL,
+  urlToKey,
 };
 
 const kStorageKey = "expiryTabInformation";
@@ -18,19 +18,12 @@ const kTitleKey = "tabTitle";
 const kURLKey = "tabURL";
 const kStorageDefaultHours = "best-before-default-hours";
 
-const stillExists = (tabId, allTabs) =>
-  allTabs.some((tab) => `${tab.id}` === tabId);
-
-const findMatchingTabIdForURL = (url, allTabs) => {
-  console.info(
-    `Looking for matching tab among those existing, with url ${url}`,
-  );
-  console.log(allTabs);
-  for (const tab of allTabs) {
-    if (tab.url == url) {
-      console.info(`Found existing tab with id ${tab.id}`);
-      return tab.id;
-    }
+const urlToKey = (url) => {
+  if (url) {
+    return btoa(url);
   }
   return null;
 };
+
+const stillExists = (tabId, allTabs) =>
+  allTabs.some((tab) => `${tab.id}` === tabId);
