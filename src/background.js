@@ -22,8 +22,7 @@ function setupAlarms() {
   chrome.alarms.create("cleanupExpiredTabs", { periodInMinutes: 60 });
 }
 
-
-  function setupTabEventListeners() {
+function setupTabEventListeners() {
   chrome.tabs.onCreated.addListener(handleTabCreated);
   chrome.tabs.onUpdated.addListener(handleTabUpdated);
   chrome.tabs.onRemoved.addListener(handleTabRemoved);
@@ -74,14 +73,20 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       }
       const expirationTime = DateTime.fromISO(tabInformation[kExpirationKey]);
       if (currentTime >= expirationTime) {
-        const tabsToClose = await chrome.tabs.query({
-          url: tabInformation[kURLKey],
-        });
-        for (const tab of tabsToClose) {
-          chrome.tabs.remove(tab.id).catch(() => {});
+        try {
+          const tabsToClose = await chrome.tabs.query({
+            url: tabInformation[kURLKey],
+          });
+          for (const tab of tabsToClose) {
+            chrome.tabs.remove(tab.id).catch(() => {});
+          }
+          delete expiringTabInformation[key];
+          changed = true;
+        } catch (err) {
+          console.log(err);
+          delete expiringTabInformation[key];
+          console.info(`Removing key from list: ${key}`);
         }
-        delete expiringTabInformation[key];
-        changed = true;
       }
     }
     if (changed) {
@@ -182,11 +187,7 @@ function handleTabRemoved(tabId, removeInfo) {
   // We don't need to do anything here anymore, as we are not tracking by tabId
 }
 
-async function setExpirationDateTime(
-  tabTitle,
-  tabURL,
-  expirationDateTime,
-) {
+async function setExpirationDateTime(tabTitle, tabURL, expirationDateTime) {
   if (isNewTab(tabURL)) return;
   const key = urlToKey(tabURL);
   if (!key) return;

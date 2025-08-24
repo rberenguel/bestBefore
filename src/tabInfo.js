@@ -147,11 +147,9 @@ chrome.tabs.query({}, (existingTabs) => {
       document.getElementById(deleteButtonId).addEventListener("click", () => {
         deleteTab(key);
       });
-      document
-        .getElementById(switchButtonId)
-        .addEventListener("click", () => {
-          switchToTab(tabInformation[kURLKey]);
-        });
+      document.getElementById(switchButtonId).addEventListener("click", () => {
+        switchToTab(tabInformation[kURLKey]);
+      });
       const tabInfoTableContainer = document.getElementById(
         "tabInfoTableContainer",
       );
